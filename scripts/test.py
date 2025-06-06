@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, accuracy_score
 import matplotlib.pyplot as plt
 from utils.utils import EmbeddingExtractor
+from utils.utils import batched_embedding
 
 # Assumes: EmbeddingExtractor and batched_embedding are already defined
 
