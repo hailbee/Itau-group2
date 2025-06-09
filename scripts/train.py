@@ -1,4 +1,4 @@
-def train(model, dataloader, criterion, optimizer, device, epochs=5):
+def train_pair(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
@@ -25,3 +25,25 @@ def train(model, dataloader, criterion, optimizer, device, epochs=5):
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch Loss: {avg_loss:.4f}")
         return avg_loss
+
+def train_triplet_e(model, dataloader, criterion, optimizer, device):
+    model.train()
+    total_loss = 0
+    for batch in dataloader:
+        optimizer.zero_grad()
+
+        anchor_input = {k: v.to(device) for k, v in batch['anchor'].items()}
+        positive_input = {k: v.to(device) for k, v in batch['positive'].items()}
+        negative_input = {k: v.to(device) for k, v in batch['negative'].items()}
+
+        anchor_emb = model(**anchor_input)
+        positive_emb = model(**positive_input)
+        negative_emb = model(**negative_input)
+
+        loss = criterion(anchor_emb, positive_emb, negative_emb)
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+
+    return total_loss / len(dataloader)

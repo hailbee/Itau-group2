@@ -4,10 +4,10 @@ import pandas as pd
 from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
-from utils.loss import ContrastiveLoss
+from utils.loss import CosineLoss
 from utils.data import TextPairDataset
-from scripts.train import train
-from scripts.test import test_model
+from scripts.train import train_pair
+from scripts.test import test_pair_model
 from scripts.eval import evaluate_model
 from models.siamese_clip import SiameseCLIPModel
 
@@ -26,14 +26,14 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                 for margin in margins:
                     model = SiameseCLIPModel(embedding_dim=512, projection_dim=internal_layer_size).to(device)
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-                    criterion = ContrastiveLoss(margin=margin)
+                    criterion = CosineLoss(margin=margin)
 
                     best_model_state = None
                     best_loss = float("inf")
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
                     for epoch in range(5):
-                        epoch_loss = train(model, dataloader, criterion, optimizer, device)
+                        epoch_loss = train_pair(model, dataloader, criterion, optimizer, device)
                         if epoch_loss < best_loss:
                             best_loss = epoch_loss
                             best_model_state = model.state_dict()
@@ -50,7 +50,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
 
                     # Evaluate
                     print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
-                    results_df_eval = test_model(model, reference_filepath, test_filepath, batch_size=batch_size)
+                    results_df_eval = test_pair_model(model, reference_filepath, test_filepath, batch_size=batch_size)
                     evaluation_metrics = evaluate_model(results_df_eval)
 
                     y_true = results_df_eval['label']
