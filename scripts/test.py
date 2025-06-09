@@ -8,11 +8,15 @@ from utils.utils import batched_embedding
 
 
 # test_model(trained_model_path, reference_data_file_path, test_file_path):
-#       legit_names = utilHelperFunc(reference_data_file_path)
+#       reference_names = utilHelperFunc(reference_data_file_path)
 #       test_names, test_labels = helperfunc(test_file_path)
-def test_model(trained_model, legit_names, test_names, test_labels, batch_size=32):
+def test_model(trained_model, reference_filepath, test_filepath, batch_size=32):
+    reference_names = pd.read_csv(reference_filepath)['normalized_company'].tolist()
+    test_names = pd.read_csv(test_filepath)['company'].tolist()
+    test_labels = pd.read_csv(test_filepath)['label'].tolist()
+
     extractor = EmbeddingExtractor(trained_model)
-    legit_embeddings = batched_embedding(extractor, legit_names, batch_size)
+    legit_embeddings = batched_embedding(extractor, reference_names, batch_size)
     test_embeddings = batched_embedding(extractor, test_names, batch_size)
 
     similarity_matrix = F.cosine_similarity(
@@ -25,7 +29,7 @@ def test_model(trained_model, legit_names, test_names, test_labels, batch_size=3
     for i, test_name in enumerate(test_names):
         sims = similarity_matrix[i]
         max_sim, idx = torch.max(sims, dim=0)
-        matched_name = legit_names[idx]
+        matched_name = reference_names[idx]
         label = test_labels[i]
 
         results.append({
