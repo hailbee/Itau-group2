@@ -1,4 +1,4 @@
-from utils.utils import plot_roc_curve, find_best_threshold_youden, plot_confusion_matrix, find_best_threshold_accuracy
+from utils.evals import plot_roc_curve, find_best_threshold_youden, plot_confusion_matrix, find_best_threshold_accuracy
 
 def evaluate_model(results_df):
     """

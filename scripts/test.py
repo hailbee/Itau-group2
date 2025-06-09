@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 import pandas as pd
-from utils.utils import EmbeddingExtractor
-from utils.utils import batched_embedding
+from utils.embeddings import EmbeddingExtractor
+from utils.embeddings import batched_embedding
 
 # Assumes: EmbeddingExtractor and batched_embedding are already defined
 

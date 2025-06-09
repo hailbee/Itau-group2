@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
-from utils.utils import ContrastiveLoss
+from utils.loss import ContrastiveLoss
 from scripts.train import train
 from scripts.test import test_model
 from scripts.eval import evaluate_model
