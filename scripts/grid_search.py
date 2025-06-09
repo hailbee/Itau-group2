@@ -5,14 +5,18 @@ from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
 from utils.loss import ContrastiveLoss
+from utils.data import TextPairDataset
 from scripts.train import train
 from scripts.test import test_model
 from scripts.eval import evaluate_model
 
-def grid_search(dataset, device, reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, model_class):
+def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, model_class):
     results = []
     best_acc = 0
     best_config = {}
+
+    dataset = TextPairDataset(reference_filepath)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for batch_size in batch_sizes:
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
