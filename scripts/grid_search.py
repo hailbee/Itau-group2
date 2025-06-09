@@ -9,8 +9,9 @@ from utils.data import TextPairDataset
 from scripts.train import train
 from scripts.test import test_model
 from scripts.eval import evaluate_model
+from models.siamese_clip import SiameseCLIPModel
 
-def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, model_class):
+def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes):
     results = []
     best_acc = 0
     best_config = {}
@@ -23,7 +24,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
         for internal_layer_size in internal_layer_sizes:
             for lr in lrs:
                 for margin in margins:
-                    model = model_class(embedding_dim=512, projection_dim=internal_layer_size).to(device)
+                    model = SiameseCLIPModel(embedding_dim=512, projection_dim=internal_layer_size).to(device)
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
                     criterion = ContrastiveLoss(margin=margin)
 
