@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 class TextPairDataset(Dataset):
     def __init__(self, dataframe):
@@ -14,23 +14,13 @@ class TextPairDataset(Dataset):
         return self.name1[idx], self.name2[idx], torch.tensor(self.label[idx], dtype=torch.float32)
 
 class TripletDataset(Dataset):
-    def __init__(self, anchor_data, positive_data, negative_data, tokenizer):
-        self.anchor_data = anchor_data
-        self.positive_data = positive_data
-        self.negative_data = negative_data
-        self.tokenizer = tokenizer
+    def __init__(self, dataframe):
+        self.anchor_data = dataframe['fraud_name'].tolist()
+        self.positive_data = dataframe['real_name'].tolist()
+        self.negative_data = dataframe['negative_name'].tolist()
 
     def __len__(self):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        anchor = self.tokenizer(self.anchor_data[idx], return_tensors='pt', padding='max_length', truncation=True)
-        positive = self.tokenizer(self.positive_data[idx], return_tensors='pt', padding='max_length', truncation=True)
-        negative = self.tokenizer(self.negative_data[idx], return_tensors='pt', padding='max_length', truncation=True)
-
-        # remove batch dimension
-        return { 
-            'anchor': {k: v.squeeze(0) for k, v in anchor.items()},
-            'positive': {k: v.squeeze(0) for k, v in positive.items()},
-            'negative': {k: v.squeeze(0) for k, v in negative.items()}
-        }
+        return self.anchor_data[idx], self.positive_data[idx], self.negative_data[idx]

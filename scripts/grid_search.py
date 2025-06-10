@@ -4,53 +4,62 @@ import pandas as pd
 from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
-from utils.loss import CosineLoss
-from utils.data import TextPairDataset
-from scripts.train import train_pair
-from scripts.test import test_pair_model
+from utils.loss import CosineLoss, CosineTripletLoss
+from utils.data import BaseTextDataset
+from scripts.train import train_pair, train_triplet
+from scripts.test import test_model
 from scripts.eval import evaluate_model
-from models.siamese_clip import SiameseCLIPModel
+from models.siamese_clip import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
-def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes):
+def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair"):
     results = []
     best_acc = 0
     best_config = {}
 
-    dataset = TextPairDataset(reference_filepath)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if mode == "pair":
+        dataset = BaseTextDataset(reference_filepath, ['name1', 'name2', 'label'])
+        train_func = train_pair
+        model_class = SiameseCLIPModelPairs
+        loss_class = CosineLoss
+    elif mode == "triplet":
+        dataset = BaseTextDataset(reference_filepath, ['fraud_name', 'real_name', 'negative_name'])
+        train_func = train_triplet
+        model_class = SiameseCLIPTriplet
+        loss_class = CosineTripletLoss
+    else:
+        raise ValueError("Unsupported mode. Use 'pair' or 'triplet'.")
 
     for batch_size in batch_sizes:
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         for internal_layer_size in internal_layer_sizes:
             for lr in lrs:
                 for margin in margins:
-                    model = SiameseCLIPModel(embedding_dim=512, projection_dim=internal_layer_size).to(device)
+                    model = model_class(embedding_dim=512, projection_dim=internal_layer_size).to(device)
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-                    criterion = CosineLoss(margin=margin)
+                    criterion = loss_class(margin=margin)
 
                     best_model_state = None
                     best_loss = float("inf")
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
                     for epoch in range(5):
-                        epoch_loss = train_pair(model, dataloader, criterion, optimizer, device)
+                        epoch_loss = train_func(model, dataloader, criterion, optimizer, device)
                         if epoch_loss < best_loss:
                             best_loss = epoch_loss
                             best_model_state = model.state_dict()
 
-                    # Save model
-                    model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}.pth"
+                    model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}.pth"
                     if best_model_state is not None:
                         torch.save(best_model_state, model_path)
 
-                    # Load best weights back
                     if best_model_state is not None:
                         model.load_state_dict(best_model_state)
                     model.eval()
 
-                    # Evaluate
                     print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
-                    results_df_eval = test_pair_model(model, reference_filepath, test_filepath, batch_size=batch_size)
+                    results_df_eval = test_model(model, reference_filepath, test_filepath, batch_size=batch_size)
                     evaluation_metrics = evaluate_model(results_df_eval)
 
                     y_true = results_df_eval['label']
