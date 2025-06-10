@@ -1,3 +1,4 @@
+import argparse
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
@@ -129,3 +130,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
 
     print("\nOverall Best config based on max test accuracy:")
     print(best_config)
+
+
+if __name__ == "__main__":
+    print("test")
