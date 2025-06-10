@@ -1,4 +1,5 @@
 import argparse
+import ast
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
@@ -133,4 +134,30 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
 
 
 if __name__ == "__main__":
-    print("test")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reference_filepath", type=str)
+    parser.add_argument("--test_filepath", type=str)
+    parser.add_argument("--lrs", type=str)
+    parser.add_argument("--batch_size", type=str)
+    parser.add_argument("--margins", type=str)
+    parser.add_argument("--internal_layer_sizes", type=str)
+    parser.add_argument("--mode", type=str, default="pair")
+    parser.add_argument("--loss_type", type=str, default="cosine")
+
+    args = parser.parse_args()
+
+    lrs = ast.literal_eval(args.lrs)
+    batch_sizes = ast.literal_eval(args.batch_size)
+    margins = ast.literal_eval(args.margins)
+    internal_layer_sizes = ast.literal_eval(args.internal_layer_sizes)
+
+    grid_search(
+        reference_filepath=args.reference_filepath,
+        test_filepath=args.test_filepath,
+        lrs=lrs,
+        batch_sizes=batch_sizes,
+        margins=margins,
+        internal_layer_sizes=internal_layer_sizes,
+        mode=args.mode,
+        loss_type=args.loss_type
+    )
