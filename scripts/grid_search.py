@@ -4,30 +4,46 @@ import pandas as pd
 from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
-from utils.loss import CosineLoss, CosineTripletLoss
-from utils.data import BaseTextDataset
+from utils.loss import CosineLoss, EuclideanLoss, CosineTripletLoss, EuclideanTripletLoss, HybridTripletLoss
+from utils.data import TextPairDataset, TripletDataset
 from scripts.train import train_pair, train_triplet
 from scripts.test import test_model
 from scripts.eval import evaluate_model
-from models.siamese_clip import SiameseCLIPModelPairs, SiameseCLIPTriplet
+from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
-def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair"):
+def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
     results = []
     best_acc = 0
     best_config = {}
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    dataframe = pd.read_csv(reference_filepath)
+
     if mode == "pair":
-        dataset = BaseTextDataset(reference_filepath, ['name1', 'name2', 'label'])
+        dataset = TextPairDataset(dataframe)
         train_func = train_pair
         model_class = SiameseCLIPModelPairs
-        loss_class = CosineLoss
+        if loss_type == "cosine":
+            loss_class = CosineLoss
+        elif loss_type == "euclidean":
+            loss_class = EuclideanLoss
+        else:
+            raise ValueError("Unsupported loss_type for pair mode.")
+
     elif mode == "triplet":
-        dataset = BaseTextDataset(reference_filepath, ['fraud_name', 'real_name', 'negative_name'])
+        dataset = TripletDataset(dataframe)
         train_func = train_triplet
         model_class = SiameseCLIPTriplet
-        loss_class = CosineTripletLoss
+        if loss_type == "cosine":
+            loss_class = CosineTripletLoss
+        elif loss_type == "euclidean":
+            loss_class = EuclideanTripletLoss
+        elif loss_type == "hybrid":
+            loss_class = HybridTripletLoss
+        else:
+            raise ValueError("Unsupported loss_type for triplet mode.")
+
     else:
         raise ValueError("Unsupported mode. Use 'pair' or 'triplet'.")
 
@@ -38,19 +54,23 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                 for margin in margins:
                     model = model_class(embedding_dim=512, projection_dim=internal_layer_size).to(device)
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-                    criterion = loss_class(margin=margin)
+
+                    if loss_type == "hybrid" and mode == "triplet":
+                        criterion = HybridTripletLoss(margin=margin, alpha=0.5)
+                    else:
+                        criterion = loss_class(margin=margin)
 
                     best_model_state = None
                     best_loss = float("inf")
 
-                    print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
+                    print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
                     for epoch in range(5):
                         epoch_loss = train_func(model, dataloader, criterion, optimizer, device)
                         if epoch_loss < best_loss:
                             best_loss = epoch_loss
                             best_model_state = model.state_dict()
 
-                    model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}.pth"
+                    model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
                     if best_model_state is not None:
                         torch.save(best_model_state, model_path)
 
@@ -58,7 +78,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                         model.load_state_dict(best_model_state)
                     model.eval()
 
-                    print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size} ---")
+                    print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
                     results_df_eval = test_model(model, reference_filepath, test_filepath, batch_size=batch_size)
                     evaluation_metrics = evaluate_model(results_df_eval)
 
@@ -84,7 +104,8 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                             "internal_layer_size": internal_layer_size,
                             "best_loss": best_loss,
                             "best_accuracy": current_best_acc,
-                            "threshold": current_best_thresh
+                            "threshold": current_best_thresh,
+                            "loss_type": loss_type
                         }
 
                     results.append({
@@ -98,7 +119,8 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                         "test_auc": evaluation_metrics["roc_auc"],
                         "test_youden_threshold": evaluation_metrics["youden_threshold"],
                         "test_best_accuracy": current_best_acc,
-                        "test_accuracy_threshold": current_best_thresh
+                        "test_accuracy_threshold": current_best_thresh,
+                        "loss_type": loss_type
                     })
 
     results_df = pd.DataFrame(results)
