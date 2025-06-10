@@ -12,6 +12,7 @@ from scripts.eval import evaluate_model
 from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
 def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
+    print("grid search began")
     results = []
     best_acc = 0
     best_config = {}
