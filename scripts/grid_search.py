@@ -21,7 +21,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    dataframe = pd.read_csv(reference_filepath)
+    dataframe = pd.read_pickle(reference_filepath)
 
     if mode == "pair":
         dataset = TextPairDataset(dataframe)
