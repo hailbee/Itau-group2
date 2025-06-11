@@ -30,7 +30,7 @@ def plot_roc_curve(results_df):
 
     return roc_auc, fpr, tpr, thresholds
 
-def find_best_threshold_youden(results_df):
+def find_best_threshold_youden(fpr, tpr, thresholds):
     """
     Finds the best threshold based on Youden's J statistic (TPR - FPR).
 
@@ -39,17 +39,13 @@ def find_best_threshold_youden(results_df):
     Returns:
         float: Best threshold maximizing TPR - FPR.
     """
-    y_true = results_df['label']
-    y_scores = results_df['max_similarity']
-
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
     youden_index = tpr - fpr
     best_idx = youden_index.argmax()
     best_threshold = thresholds[best_idx]
     print(f"Best threshold (Youden): {best_threshold:.3f}")
     return best_threshold
 
-def plot_confusion_matrix(results_df, threshold):
+def plot_confusion_matrix(y_true, y_scores, threshold):
     """
     Plots a confusion matrix using a specified threshold to binarize predictions.
 
@@ -57,8 +53,6 @@ def plot_confusion_matrix(results_df, threshold):
         results_df (pd.DataFrame): Must contain 'label' and 'max_similarity'.
         threshold (float): Threshold for classifying scores into binary labels.
     """
-    y_true = results_df['label']
-    y_scores = results_df['max_similarity']
     y_pred = (y_scores > threshold).astype(int)
 
     cm = confusion_matrix(y_true, y_pred)
@@ -71,7 +65,7 @@ def plot_confusion_matrix(results_df, threshold):
     plt.tight_layout()
     plt.show()
 
-def find_best_threshold_accuracy(results_df):
+def find_best_threshold_accuracy(y_true, y_scores, thresholds):
     """
     Finds the best threshold that yields the highest accuracy.
 
@@ -81,10 +75,6 @@ def find_best_threshold_accuracy(results_df):
         float: Best accuracy
         float: Threshold that gives best accuracy
     """
-    y_true = results_df['label']
-    y_scores = results_df['max_similarity']
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-
     best_acc = 0
     best_acc_threshold = 0
 
