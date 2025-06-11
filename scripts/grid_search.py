@@ -16,6 +16,7 @@ from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
     print("grid search began")
     results = []
+    best_loss = float("inf")
     best_acc = 0
     best_config = {}
 
@@ -64,20 +65,14 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
                         criterion = loss_class(margin=margin)
 
                     best_model_state = None
-                    best_loss = float("inf")
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
                     model_loss = train_func(model, dataloader, criterion, optimizer, device)
                     if model_loss < best_loss:
                         best_loss = model_loss
                         best_model_state = model.state_dict()
+                        best_model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
 
-                    model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
-                    if best_model_state is not None:
-                        torch.save(best_model_state, model_path)
-
-                    if best_model_state is not None:
-                        model.load_state_dict(best_model_state)
                     model.eval()
 
                     print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
@@ -127,6 +122,9 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
 
     results_df = pd.DataFrame(results)
     results_df.to_csv("experiment_results_with_accuracy.csv", index=False)
+
+    if best_model_state is not None:
+        torch.save(best_model_state, best_model_path)
 
     print("\nOverall Best config based on max test accuracy:")
     print(best_config)
