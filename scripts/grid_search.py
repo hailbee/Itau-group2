@@ -13,7 +13,7 @@ from scripts.test import test_model
 from scripts.eval import evaluate_model
 from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
-def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
+def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
     print("grid search began")
     results = []
     best_acc = 0
@@ -82,7 +82,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
                     model.eval()
 
                     print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
-                    results_df_eval = test_model(model, reference_filepath, test_filepath, batch_size=batch_size)
+                    results_df_eval = test_model(model, test_reference_set_filepath, test_filepath, batch_size=batch_size)
                     evaluation_metrics = evaluate_model(results_df_eval)
 
                     y_true = results_df_eval['label']
@@ -136,6 +136,7 @@ def grid_search(reference_filepath, test_filepath, lrs, batch_sizes, margins, in
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reference_filepath", type=str)
+    parser.add_argument("--test_reference_set_filepath", type=str)
     parser.add_argument("--test_filepath", type=str)
     parser.add_argument("--lrs", type=str)
     parser.add_argument("--batch_size", type=str)
