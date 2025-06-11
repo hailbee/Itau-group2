@@ -30,7 +30,7 @@ def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
-    for epoch in range(epochs):
+    for epoch in range(1):
         total_loss = 0.0
         for i, (anchor_text, positive_text, negative_text) in enumerate(dataloader):
             # Forward pass
