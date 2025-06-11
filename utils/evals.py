@@ -56,6 +56,7 @@ def plot_confusion_matrix(y_true, y_scores, threshold):
     y_pred = (y_scores > threshold).astype(int)
 
     cm = confusion_matrix(y_true, y_pred)
+    print(cm)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Not Spoof', 'Spoof'])
 
     plt.figure(figsize=(5, 4))
