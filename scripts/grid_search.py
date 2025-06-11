@@ -67,11 +67,10 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
                     best_loss = float("inf")
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
-                    for epoch in range(5):
-                        epoch_loss = train_func(model, dataloader, criterion, optimizer, device)
-                        if epoch_loss < best_loss:
-                            best_loss = epoch_loss
-                            best_model_state = model.state_dict()
+                    model_loss = train_func(model, dataloader, criterion, optimizer, device)
+                    if model_loss < best_loss:
+                        best_loss = model_loss
+                        best_model_state = model.state_dict()
 
                     model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
                     if best_model_state is not None:
