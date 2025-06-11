@@ -49,7 +49,7 @@ def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
             loss.backward()
             optimizer.step()
 
-            epcoh_loss += loss.item()
+            epoch_loss += loss.item()
 
             if i % 100 == 0:
                 print(f"Step {i} complete out of {len(dataloader)}")
