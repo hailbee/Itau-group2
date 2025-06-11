@@ -2,7 +2,7 @@ def train_pair(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
-    for epoch in range(1):
+    for epoch in range(5):
         total_loss = 0.0
         for i, (text1, text2, label) in enumerate(dataloader):
             #text1, text2, label = text1.to(device), text2.to(device), label.to(device)
@@ -30,7 +30,7 @@ def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
-    for epoch in range(1):
+    for epoch in range(5):
         total_loss = 0.0
         for i, (anchor_text, positive_text, negative_text) in enumerate(dataloader):
             # Forward pass
