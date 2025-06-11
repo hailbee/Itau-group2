@@ -2,8 +2,9 @@ def train_pair(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
-    for epoch in range(5):
-        total_loss = 0.0
+    best_epoch_loss = float('inf')
+    for epoch in range(epochs):
+        epoch_loss = 0.0
         for i, (text1, text2, label) in enumerate(dataloader):
             #text1, text2, label = text1.to(device), text2.to(device), label.to(device)
             label = label.to(device)
@@ -17,21 +18,26 @@ def train_pair(model, dataloader, criterion, optimizer, device, epochs=5):
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item()
+            epoch_loss += loss.item()
 
             if i % 100 == 0:
                 print(f"Step {i} complete out of {len(dataloader)}")
 
-        avg_loss = total_loss / len(dataloader)
+        avg_loss = epoch_loss / len(dataloader)
         print(f"Epoch Loss: {avg_loss:.4f}")
-        return avg_loss
+
+        if avg_loss < best_epoch_loss:
+            best_epoch_loss = avg_loss
+
+    return best_epoch_loss
 
 def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
     model.to(device)
     model.train()
 
-    for epoch in range(5):
-        total_loss = 0.0
+    best_epoch_loss = float('inf')
+    for epoch in range(epochs):
+        epoch_loss = 0.0
         for i, (anchor_text, positive_text, negative_text) in enumerate(dataloader):
             # Forward pass
             z_anchor, z_positive, z_negative = model(anchor_text, positive_text, negative_text)
@@ -43,14 +49,17 @@ def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item()
+            epcoh_loss += loss.item()
 
             if i % 100 == 0:
                 print(f"Step {i} complete out of {len(dataloader)}")
 
-        avg_loss = total_loss / len(dataloader)
+        avg_loss = epoch_loss / len(dataloader)
         print(f"Epoch Loss: {avg_loss:.4f}")
-        return avg_loss
+
+        if avg_loss < best_epoch_loss:
+            best_epoch_loss = avg_loss
+    return best_epoch_loss
     
 ################ Alternative Version
 # def train_general(model, dataloader, criterion, optimizer, device, mode="pair", epochs=5):
