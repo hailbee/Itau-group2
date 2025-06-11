@@ -154,6 +154,7 @@ if __name__ == "__main__":
 
     grid_search(
         reference_filepath=args.reference_filepath,
+        test_reference_set_filepath=args.test_reference_set_filepath,
         test_filepath=args.test_filepath,
         lrs=lrs,
         batch_sizes=batch_sizes,
