@@ -45,9 +45,13 @@ def train_and_val_pair(model, dataloader, criterion, optimizer, device, test_ref
         if avg_loss < best_epoch_loss:
             best_epoch_loss = avg_loss
 
-        ### Evaluate accuracy on test set
+        ### Evaluate on test set
         model.eval()
         results_df = test_model(model, test_reference_filepath, test_filepath)
+       
+        ### change this in line with ROC_AUC
+        ### find the youden threshold first (use function from eval)
+        ### make preds based on that
         preds = [1 if r > 0.8 else 0 for r in results_df['max_similarity']]  # Adjust threshold as needed
         labels = results_df['label'].tolist()
 

@@ -151,7 +151,7 @@ if __name__ == "__main__":
     margins = ast.literal_eval(args.margins)
     internal_layer_sizes = ast.literal_eval(args.internal_layer_sizes)
 
-    grid_search(
+    validation_grid_search(
         reference_filepath=args.reference_filepath,
         test_reference_set_filepath=args.test_reference_set_filepath,
         test_filepath=args.test_filepath,
