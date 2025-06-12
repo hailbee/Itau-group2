@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 import pandas as pd
 from datetime import datetime
-from sklearn.metrics import roc_curve, accuracy_score
+from sklearn.metrics import roc_curve, accuracy_score, confusion_matrix
 
 from utils.loss import CosineLoss, EuclideanLoss, CosineTripletLoss, EuclideanTripletLoss, HybridTripletLoss
 from utils.data import TextPairDataset, TripletDataset
@@ -96,12 +96,19 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
 
                     current_best_acc = 0
                     current_best_thresh = 0
+                    best_conf_matrix = None
+
                     for t in thresholds:
                         y_pred = (y_scores > t).astype(int)
                         acc = accuracy_score(y_true, y_pred)
                         if acc > current_best_acc:
                             current_best_acc = acc
                             current_best_thresh = t
+                            best_conf_matrix = confusion_matrix(y_true, y_pred)
+                            if best_conf_matrix.shape == (2, 2):
+                                tn, fp, fn, tp = best_conf_matrix.ravel()
+                            else:
+                                tn, fp, fn, tp = (None, None, None, None)
 
                     if current_best_acc > best_acc:
                         best_acc = current_best_acc
@@ -117,19 +124,24 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
                         }
 
                     results.append({
-                        "timestamp": datetime.now(),
-                        "lr": lr,
-                        "batch_size": batch_size,
-                        "margin": margin,
-                        "internal_layer_size": internal_layer_size,
-                        "epochs": 5,
-                        "best_train_loss": best_loss,
-                        "test_auc": evaluation_metrics["roc_auc"],
-                        "test_youden_threshold": evaluation_metrics["youden_threshold"],
-                        "test_best_accuracy": current_best_acc,
-                        "test_accuracy_threshold": current_best_thresh,
-                        "loss_type": loss_type
-                    })
+                                    "timestamp": datetime.now(),
+                                    "lr": lr,
+                                    "batch_size": batch_size,
+                                    "margin": margin,
+                                    "internal_layer_size": internal_layer_size,
+                                    "epochs": 5,
+                                    "best_train_loss": best_loss,
+                                    "test_auc": evaluation_metrics["roc_auc"],
+                                    "test_youden_threshold": evaluation_metrics["youden_threshold"],
+                                    "test_best_accuracy": current_best_acc,
+                                    "test_accuracy_threshold": current_best_thresh,
+                                    "loss_type": loss_type,
+                                    "confusion_tn": tn,
+                                    "confusion_fp": fp,
+                                    "confusion_fn": fn,
+                                    "confusion_tp": tp
+                                })
+
 
     results_df = pd.DataFrame(results)
     results_df.to_csv("experiment_results_with_accuracy.csv", index=False)
