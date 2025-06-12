@@ -88,3 +88,5 @@ def find_best_threshold_accuracy(y_true, y_scores, thresholds):
 
     print(f"Best Accuracy: {best_acc:.4f} at Threshold: {best_acc_threshold:.3f}")
     return best_acc, best_acc_threshold
+
+def find_best_threshold_precision():
