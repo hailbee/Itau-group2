@@ -43,7 +43,7 @@ Fraudsters are creating visually similar spoof accounts to impersonate trusted c
 - `scripts/train.py`: Contains training loops for both contrastive (`train_pair`) and triplet (`train_triplet`) loss models.
 - `scripts/test.py`: Computes model predictions by comparing test names to a reference set using Cosine/Euclidean similarity of projected embeddings.
 - `scripts/eval.py`: Evaluates model predictions using ROC curve, confusion matrix, and threshold-based accuracy metrics.
-- 'scripts/test_raw_clip.py': Evaluates performance using raw (untrained) CLIP embeddings for baseline comparison.
+- `scripts/test_raw_clip.py`: Evaluates performance using raw (untrained) CLIP embeddings for baseline comparison.
 
 ---
 
