@@ -1,6 +1,6 @@
 # 🕵️‍♂️ Spoof Detection with CLIP Embeddings - Itaú Group 2
 
-Fraudsters are increasingly creating visually similar spoof accounts to impersonate trusted companies, posing a serious risk to financial institutions like Itaú Unibanco. This repository contains the code and data used to train, test, and evaluate a spoof detection system based on CLIP embeddings, combined with Cosine and Euclidean similarity metrics. Our approach begins by training the model on a dataset of spoofed names, then testing it on a ~1,800-name German dataset. We evaluate performance using confusion matrices, accuracy, and precision.
+Fraudsters are creating visually similar spoof accounts to impersonate trusted companies, posing a serious risk to financial institutions like Itaú Unibanco. This repository contains the code and data used to train, test, and evaluate a spoof detection system based on CLIP embeddings, combined with Cosine and Euclidean similarity metrics. Our approach begins by training the model on a dataset of spoofed names, then testing it on a ~1,800-name German dataset. We evaluate performance using confusion matrices, accuracy, and precision.
 
 ---
 
