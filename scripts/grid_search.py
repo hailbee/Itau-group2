@@ -151,6 +151,7 @@ if __name__ == "__main__":
     parser.add_argument("--internal_layer_sizes", type=str)
     parser.add_argument("--mode", type=str, default="pair")
     parser.add_argument("--loss_type", type=str, default="cosine")
+    parser.add_argument("--warmup_filepath", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -168,5 +169,6 @@ if __name__ == "__main__":
         margins=margins,
         internal_layer_sizes=internal_layer_sizes,
         mode=args.mode,
-        loss_type=args.loss_type
+        loss_type=args.loss_type,
+        warmup_filepath=args.warmup_filepath
     )
