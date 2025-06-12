@@ -1,5 +1,32 @@
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, accuracy_score
+from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, accuracy_score, precision_score
+
+def find_best_threshold_precision(y_true, y_scores, thresholds):
+    """
+    Finds the best threshold that yields the highest precision.
+
+    Args:
+        y_true (list or np.ndarray): Ground truth binary labels.
+        y_scores (list or np.ndarray): Predicted similarity scores.
+        thresholds (list or np.ndarray): Thresholds to test.
+
+    Returns:
+        float: Best precision
+        float: Threshold that gives best precision
+    """
+    best_prec = 0
+    best_prec_threshold = 0
+
+    for t in thresholds:
+        y_pred = (y_scores > t).astype(int)
+        prec = precision_score(y_true, y_pred, zero_division=0)
+        if prec > best_prec:
+            best_prec = prec
+            best_prec_threshold = t
+
+    print(f"Best Precision: {best_prec:.4f} at Threshold: {best_prec_threshold:.3f}")
+    return best_prec, best_prec_threshold
+
 
 def plot_roc_curve(results_df):
     """
@@ -89,4 +116,28 @@ def find_best_threshold_accuracy(y_true, y_scores, thresholds):
     print(f"Best Accuracy: {best_acc:.4f} at Threshold: {best_acc_threshold:.3f}")
     return best_acc, best_acc_threshold
 
-def find_best_threshold_precision():
+def find_best_threshold_precision(y_true, y_scores, thresholds):
+    """
+    Finds the best threshold that yields the highest precision.
+
+    Args:
+        y_true (list or np.ndarray): Ground truth binary labels.
+        y_scores (list or np.ndarray): Predicted similarity scores.
+        thresholds (list or np.ndarray): Thresholds to test.
+
+    Returns:
+        float: Best precision
+        float: Threshold that gives best precision
+    """
+    best_prec = 0
+    best_prec_threshold = 0
+
+    for t in thresholds:
+        y_pred = (y_scores > t).astype(int)
+        prec = precision_score(y_true, y_pred, zero_division=0)
+        if prec > best_prec:
+            best_prec = prec
+            best_prec_threshold = t
+
+    print(f"Best Precision: {best_prec:.4f} at Threshold: {best_prec_threshold:.3f}")
+    return best_prec, best_prec_threshold

@@ -3,14 +3,11 @@ import ast
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
-from datetime import datetime
 from sklearn.metrics import roc_curve, accuracy_score
 
 from utils.loss import CosineLoss, EuclideanLoss, CosineTripletLoss, EuclideanTripletLoss, HybridTripletLoss
 from utils.data import TextPairDataset, TripletDataset
 from scripts.train_and_validate import train_and_val_pair, train_and_val_triplet
-from scripts.test import test_model
-from scripts.eval import evaluate_model
 from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
 def validation_grid_search(reference_filepath, test_reference_set_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
@@ -64,73 +61,16 @@ def validation_grid_search(reference_filepath, test_reference_set_filepath, test
                     else:
                         criterion = loss_class(margin=margin)
 
-                    best_model_state = None
-
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
-                    model_loss = train_func(model, dataloader, criterion, optimizer, device, test_reference_set_filepath, test_filepath)
-                    
-                    
-                    # if model_loss < best_loss:
-                    #     best_loss = model_loss
-                    #     best_model_state = model.state_dict()
-                    #     best_model_path = f"model_lr{lr}_bs{batch_size}_m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
-
-    #                 model.eval()
-
-    #                 print(f"--- Evaluating config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
-    #                 results_df_eval = test_model(model, test_reference_set_filepath, test_filepath, batch_size=batch_size)
-    #                 evaluation_metrics = evaluate_model(results_df_eval)
-
-    #                 y_true = results_df_eval['label']
-    #                 y_scores = results_df_eval['max_similarity']
-    #                 fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-
-    #                 current_best_acc = 0
-    #                 current_best_thresh = 0
-    #                 for t in thresholds:
-    #                     y_pred = (y_scores > t).astype(int)
-    #                     acc = accuracy_score(y_true, y_pred)
-    #                     if acc > current_best_acc:
-    #                         current_best_acc = acc
-    #                         current_best_thresh = t
-
-    #                 if current_best_acc > best_acc:
-    #                     best_acc = current_best_acc
-    #                     best_config = {
-    #                         "lr": lr,
-    #                         "batch_size": batch_size,
-    #                         "margin": margin,
-    #                         "internal_layer_size": internal_layer_size,
-    #                         "best_loss": best_loss,
-    #                         "best_accuracy": current_best_acc,
-    #                         "threshold": current_best_thresh,
-    #                         "loss_type": loss_type
-    #                     }
-
-    #                 results.append({
-    #                     "timestamp": datetime.now(),
-    #                     "lr": lr,
-    #                     "batch_size": batch_size,
-    #                     "margin": margin,
-    #                     "internal_layer_size": internal_layer_size,
-    #                     "epochs": 5,
-    #                     "best_train_loss": best_loss,
-    #                     "test_auc": evaluation_metrics["roc_auc"],
-    #                     "test_youden_threshold": evaluation_metrics["youden_threshold"],
-    #                     "test_best_accuracy": current_best_acc,
-    #                     "test_accuracy_threshold": current_best_thresh,
-    #                     "loss_type": loss_type
-    #                 })
-
-    # results_df = pd.DataFrame(results)
-    # results_df.to_csv("experiment_results_with_accuracy.csv", index=False)
-
-    # if best_model_state is not None:
-    #     torch.save(best_model_state, best_model_path)
-
-    # print("\nOverall Best config based on max test accuracy:")
-    # print(best_config)
-
+                    model_loss = train_func(
+                        model,
+                        dataloader,
+                        criterion,
+                        optimizer,
+                        device,
+                        test_reference_set_filepath,
+                        test_filepath
+                    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
