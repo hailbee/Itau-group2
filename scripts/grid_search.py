@@ -8,12 +8,12 @@ from sklearn.metrics import roc_curve, accuracy_score
 
 from utils.loss import CosineLoss, EuclideanLoss, CosineTripletLoss, EuclideanTripletLoss, HybridTripletLoss
 from utils.data import TextPairDataset, TripletDataset
-from scripts.train import train_pair, train_triplet
+from scripts.train import train_pair, train_triplet, train_triplet_warmup
 from scripts.test import test_model
 from scripts.eval import evaluate_model
 from models.models import SiameseCLIPModelPairs, SiameseCLIPTriplet
 
-def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine"):
+def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, lrs, batch_sizes, margins, internal_layer_sizes, mode="pair", loss_type="cosine", warmup_filepath=None):
     print("grid search began")
     results = []
     best_loss = float("inf")
@@ -23,6 +23,8 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     dataframe = pd.read_pickle(reference_filepath)
+    if warmup_filepath:
+        warmup_dataframe = pd.read_pickle(warmup_filepath)
 
     if mode == "pair":
         dataset = TextPairDataset(dataframe)
@@ -38,6 +40,9 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
     elif mode == "triplet":
         dataset = TripletDataset(dataframe)
         train_func = train_triplet
+        if warmup_filepath:
+            train_func = train_triplet_warmup
+            warmup_dataset = TripletDataset(warmup_dataframe)
         model_class = SiameseCLIPTriplet
         if loss_type == "cosine":
             loss_class = CosineTripletLoss
@@ -53,6 +58,8 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
 
     for batch_size in batch_sizes:
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        if warmup_filepath:
+            warmup_loader = DataLoader(warmup_dataset, batch_size=batch_size, shuffle=True)
         for internal_layer_size in internal_layer_sizes:
             for lr in lrs:
                 for margin in margins:
@@ -67,7 +74,10 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
                     best_model_state = None
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
-                    model_loss = train_func(model, dataloader, criterion, optimizer, device)
+                    if warmup_filepath:
+                        model_loss = train_func(model, warmup_loader, dataloader, criterion, optimizer, device)
+                    else:
+                        model_loss = train_func(model, dataloader, criterion, optimizer, device)
                     if model_loss < best_loss:
                         best_loss = model_loss
                         best_model_state = model.state_dict()
