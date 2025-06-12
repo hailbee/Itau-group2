@@ -2,6 +2,7 @@ from test import test_model
 from sklearn.metrics import precision_score, recall_score
 
 ### High number of epochs: 30 for now
+### Maybe write results to a file?
 def train_and_val_pair(model, dataloader, criterion, optimizer, device, test_reference_filepath, test_filepath, epochs=30):
     best_metrics = {
     'accuracy': 0.0,
