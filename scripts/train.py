@@ -62,7 +62,7 @@ def train_triplet(model, dataloader, criterion, optimizer, device, epochs=5):
     return best_epoch_loss
 
  
-def train_triplet_warmup(model, warmup_loader, hard_loader, criterion, optimizer, device, warmup_epochs=3, epochs=6):
+def train_triplet_warmup(model, warmup_loader, hard_loader, criterion, optimizer, device, warmup_epochs=5, epochs=10):
     model.to(device)
     model.train()
 
