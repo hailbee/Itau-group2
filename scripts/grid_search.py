@@ -75,6 +75,7 @@ def grid_search(reference_filepath, test_reference_set_filepath, test_filepath, 
 
                     print(f"\n--- Training config: lr={lr}, bs={batch_size}, margin={margin}, size={internal_layer_size}, loss={loss_type} ---")
                     if warmup_filepath:
+                        print("Warm up Training!")
                         model_loss = train_func(model, warmup_loader, dataloader, criterion, optimizer, device)
                     else:
                         model_loss = train_func(model, dataloader, criterion, optimizer, device)
