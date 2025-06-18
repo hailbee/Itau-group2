@@ -197,18 +197,13 @@ class GridSearcher:
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
         elif mode == "supcon":
-            if self.model_class == SiameseCLIPSupCon:
-                return self.model_class.get_dataloader(dataframe, batch_size=batch_size)
-            else:
-                raise ValueError("SupCon mode requires SiameseCLIPSupCon model")
-        else:  # infonce
-            if self.model_class == SiameseCLIPInfoNCE:
-                return self.model_class.get_dataloader(dataframe, batch_size=batch_size)
-            else:
-                raise ValueError("InfoNCE mode requires SiameseCLIPInfoNCE model")
-        
-        return torch.utils.data.DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=True
-        ) 
+            from utils.data import SupConDataset
+            dataset = SupConDataset(dataframe)
+        elif mode == "infonce":
+            from utils.data import InfoNCEDataset
+            dataset = InfoNCEDataset(dataframe)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+        from torch.utils.data import DataLoader
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4) 

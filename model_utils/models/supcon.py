@@ -29,24 +29,3 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
             self.encode(neg_list) for neg_list in negative_texts
         ], dim=0)  # [batch_size, n_negatives, emb_dim]
         return z_anchor, z_positives, z_negatives
-
-    @staticmethod
-    def get_dataloader(dataframe, batch_size=256, num_workers=4):
-        """
-        Returns a DataLoader for SupCon training with fixed numbers of positives and negatives.
-        
-        Args:
-            dataframe: DataFrame containing the data
-            batch_size: Batch size
-            num_workers: Number of workers for data loading
-            
-        Returns:
-            DataLoader: DataLoader for SupCon training
-        """
-        dataset = SupConDataset(dataframe)
-        return DataLoader(
-            dataset, 
-            batch_size=batch_size,
-            shuffle=False,  # No shuffling to maintain order
-            num_workers=num_workers
-        ) 

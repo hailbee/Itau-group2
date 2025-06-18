@@ -27,24 +27,3 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
             self.encode(neg_list) for neg_list in negative_texts
         ], dim=0)  # [batch_size, n_negatives, emb_dim]
         return z_anchor, z_positive, z_negatives
-
-    @staticmethod
-    def get_dataloader(dataframe, batch_size=256, num_workers=4):
-        """
-        Returns a DataLoader for InfoNCE training with fixed number of negatives.
-        
-        Args:
-            dataframe: DataFrame containing the data
-            batch_size: Batch size
-            num_workers: Number of workers for data loading
-            
-        Returns:
-            DataLoader: DataLoader for InfoNCE training
-        """
-        dataset = InfoNCEDataset(dataframe)
-        return DataLoader(
-            dataset, 
-            batch_size=batch_size,
-            shuffle=False,  # No shuffling to maintain order
-            num_workers=num_workers
-        ) 
