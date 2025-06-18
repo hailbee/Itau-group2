@@ -28,32 +28,60 @@ class TripletDataset(Dataset):
 
 class SupConDataset(Dataset):
     def __init__(self, dataframe):
+        """
+        Dataset for SupCon that handles multiple positives and negatives per anchor.
+        Each anchor should have exactly 3 positives and 3 negatives.
+        
+        Args:
+            dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (list of positives),
+                      'negative_name' (list of negatives)
+        """
         self.anchor_data = dataframe['fraud_name'].tolist()
-        self.positive_data = dataframe['real_name'].tolist()
-        self.label = dataframe['label'].tolist()
+        self.positive_data = dataframe['real_name'].tolist()  # Should be list of lists
+        self.negative_data = dataframe['negative_name'].tolist()  # Should be list of lists
 
     def __len__(self):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        return self.anchor_data[idx], self.positive_data[idx], self.label[idx]
+        """Returns anchor, exactly 3 positives and 3 negatives"""
+        anchor = self.anchor_data[idx]
+        positives = self.positive_data[idx][:3]  # Take first 3 positives
+        negatives = self.negative_data[idx][:3]  # Take first 3 negatives
+        
+        # Pad if necessary
+        if len(positives) < 3:
+            positives = positives + [positives[0]] * (3 - len(positives))
+        if len(negatives) < 3:
+            negatives = negatives + [negatives[0]] * (3 - len(negatives))
+            
+        return anchor, positives, negatives
 
 class InfoNCEDataset(Dataset):
     def __init__(self, dataframe):
         """
         Dataset for InfoNCE that handles one positive and multiple negatives per anchor.
+        Each anchor should have exactly 1 positive and 3 negatives.
         
         Args:
             dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (positive),
-                      and 'negative_name' (list of negatives)
+                      'negative_name' (list of negatives)
         """
         self.anchor_data = dataframe['fraud_name'].tolist()
         self.positive_data = dataframe['real_name'].tolist()
-        self.negative_data = dataframe['negative_name'].tolist()
+        self.negative_data = dataframe['negative_name'].tolist()  # Should be list of lists
 
     def __len__(self):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        """Returns anchor, one positive, and list of negatives"""
-        return self.anchor_data[idx], self.positive_data[idx], self.negative_data[idx]
+        """Returns anchor, one positive, and exactly 3 negatives"""
+        anchor = self.anchor_data[idx]
+        positive = self.positive_data[idx]
+        negatives = self.negative_data[idx][:3]  # Take first 3 negatives
+        
+        # Pad if necessary
+        if len(negatives) < 3:
+            negatives = negatives + [negatives[0]] * (3 - len(negatives))
+            
+        return anchor, positive, negatives

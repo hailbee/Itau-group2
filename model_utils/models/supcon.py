@@ -44,7 +44,7 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
         Returns:
             DataLoader: DataLoader for SupCon training
         """
-        dataset = SupConDataset(dataframe, n_positives=3, n_negatives=3)
+        dataset = SupConDataset(dataframe)
         return DataLoader(
             dataset, 
             batch_size=batch_size,

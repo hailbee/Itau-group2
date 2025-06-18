@@ -44,7 +44,7 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         Returns:
             DataLoader: DataLoader for InfoNCE training
         """
-        dataset = InfoNCEDataset(dataframe, n_negatives=3)
+        dataset = InfoNCEDataset(dataframe)
         return DataLoader(
             dataset, 
             batch_size=batch_size,
