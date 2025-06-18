@@ -108,7 +108,15 @@ def main():
 
     elif args.mode == 'grid_search':
         # Grid search
-        model_class = SiameseCLIPModelPairs if args.model_type == 'pair' else SiameseCLIPTriplet
+        if args.model_type == 'pair':
+            model_class = SiameseCLIPModelPairs
+        elif args.model_type == 'triplet':
+            model_class = SiameseCLIPTriplet
+        elif args.model_type == 'supcon':
+            model_class = SiameseCLIPSupCon
+        else:  # infonce
+            model_class = SiameseCLIPInfoNCE
+            
         searcher = GridSearcher(model_class, device, log_dir=args.log_dir)
         
         lrs = ast.literal_eval(args.lrs)
