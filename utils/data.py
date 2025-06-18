@@ -36,9 +36,9 @@ class SupConDataset(Dataset):
             dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (list of positives),
                       'negative_name' (list of negatives)
         """
-        self.anchor_data = dataframe['fraud_name'].tolist()
-        self.positive_data = dataframe['real_name'].tolist()  # Should be list of lists
-        self.negative_data = dataframe['negative_name'].tolist()  # Should be list of lists
+        self.anchor_data = dataframe['real_name'].tolist()
+        self.positive_data = dataframe['positive_names'].tolist()  # Should be list of lists
+        self.negative_data = dataframe['negative_names'].tolist()  # Should be list of lists
 
     def __len__(self):
         return len(self.anchor_data)
@@ -67,9 +67,9 @@ class InfoNCEDataset(Dataset):
             dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (positive),
                       'negative_name' (list of negatives)
         """
-        self.anchor_data = dataframe['fraud_name'].tolist()
-        self.positive_data = dataframe['real_name'].tolist()
-        self.negative_data = dataframe['negative_name'].tolist()  # Should be list of lists
+        self.anchor_data = dataframe['anchor_name'].tolist()
+        self.positive_data = dataframe['positive_name'].tolist()
+        self.negative_data = dataframe['negative_names'].tolist()  # Should be list of lists
 
     def __len__(self):
         return len(self.anchor_data)
