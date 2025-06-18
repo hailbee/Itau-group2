@@ -10,25 +10,22 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
     """
     def forward(self, anchor_text, positive_text, negative_texts):
         """
-        Forward pass for InfoNCE learning.
-        
+        Forward pass for InfoNCE learning (batched).
         Args:
-            anchor_text: Anchor text input
-            positive_text: Single positive text input
-            negative_texts: List of negative text inputs (exactly 3)
-            
+            anchor_text: list of anchor text strings, len=batch_size
+            positive_text: list of positive text strings, len=batch_size
+            negative_texts: list of list of negative text strings, shape [batch_size, n_negatives]
         Returns:
             tuple: (z_anchor, z_positive, z_negatives) embeddings
         """
-        # Encode anchor
-        z_anchor = self.encode(anchor_text)
-        
-        # Encode positive
-        z_positive = self.encode(positive_text)
-        
-        # Encode negatives and stack them
-        z_negatives = torch.stack([self.encode(neg) for neg in negative_texts], dim=1)
-        
+        # Encode anchors
+        z_anchor = self.encode(anchor_text)  # [batch_size, emb_dim]
+        # Encode positives
+        z_positive = self.encode(positive_text)  # [batch_size, emb_dim]
+        # Encode negatives
+        z_negatives = torch.stack([
+            self.encode(neg_list) for neg_list in negative_texts
+        ], dim=0)  # [batch_size, n_negatives, emb_dim]
         return z_anchor, z_positive, z_negatives
 
     @staticmethod

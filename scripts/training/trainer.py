@@ -26,36 +26,9 @@ class Trainer:
         epoch_loss = 0.0
         
         for i, batch in enumerate(dataloader):
-            if mode == "pair":
-                text1, text2, label = batch
-                label = label.to(self.device)
-                z1, z2 = self.model(text1, text2)
-                loss = self.criterion(z1, z2, label)
-            elif isinstance(self.criterion, SupConLoss):
-                anchor_text, positive_texts, negative_texts = batch
-                z_anchor = self.model.encode(anchor_text)
-                # Encode positives and negatives per anchor, squeeze extra dim
-                z_positives = torch.stack(
-                    [torch.stack([self.model.encode(pos).squeeze(0) for pos in pos_list], dim=0) for pos_list in positive_texts],
-                    dim=0
-                )  # [batch_size, 3, emb_dim]
-                z_negatives = torch.stack(
-                    [torch.stack([self.model.encode(neg).squeeze(0) for neg in neg_list], dim=0) for neg_list in negative_texts],
-                    dim=0
-                )  # [batch_size, 3, emb_dim]
-                loss = self.criterion(z_anchor, z_positives, z_negatives)
-            elif isinstance(self.criterion, InfoNCELoss):
-                anchor_text, positive_text, negative_texts = batch
-                z_anchor = self.model.encode(anchor_text)
-                z_positive = self.model.encode(positive_text)
-                z_negatives = torch.stack([self.model.encode(neg) for neg in negative_texts], dim=1)
-                # InfoNCE expects anchor, positives (as [batch, 1, emb]), negatives
-                z_positives = z_positive.unsqueeze(1)  # [batch, 1, emb]
-                loss = self.criterion(z_anchor, z_positives, z_negatives)
-            else:
-                anchor_text, positive_text, negative_text = batch
-                z_anchor, z_positive, z_negative = self.model(anchor_text, positive_text, negative_text)
-                loss = self.criterion(z_anchor, z_positive, z_negative)
+            # Unified logic: model and criterion handle all modes
+            outputs = self.model(*batch)
+            loss = self.criterion(*outputs)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -101,7 +74,7 @@ class Trainer:
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "F1"])
+            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall"])
 
             for epoch in range(epochs):
                 # Use warmup loader if provided and in warmup phase
