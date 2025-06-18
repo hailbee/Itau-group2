@@ -3,6 +3,8 @@ import csv
 from sklearn.metrics import precision_score, recall_score, roc_curve
 from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
+from model_utils.loss.supcon_loss import SupConLoss
+from model_utils.loss.infonce_loss import InfoNCELoss
 
 class Trainer:
     """
@@ -29,7 +31,21 @@ class Trainer:
                 label = label.to(self.device)
                 z1, z2 = self.model(text1, text2)
                 loss = self.criterion(z1, z2, label)
-            else:  # triplet
+            elif isinstance(self.criterion, SupConLoss):
+                anchor_text, positive_texts, negative_texts = batch
+                z_anchor = self.model.encode(anchor_text)
+                z_positives = torch.stack([self.model.encode(pos) for pos in positive_texts], dim=1)
+                z_negatives = torch.stack([self.model.encode(neg) for neg in negative_texts], dim=1)
+                loss = self.criterion(z_anchor, z_positives, z_negatives)
+            elif isinstance(self.criterion, InfoNCELoss):
+                anchor_text, positive_text, negative_texts = batch
+                z_anchor = self.model.encode(anchor_text)
+                z_positive = self.model.encode(positive_text)
+                z_negatives = torch.stack([self.model.encode(neg) for neg in negative_texts], dim=1)
+                # InfoNCE expects anchor, positives (as [batch, 1, emb]), negatives
+                z_positives = z_positive.unsqueeze(1)  # [batch, 1, emb]
+                loss = self.criterion(z_anchor, z_positives, z_negatives)
+            else:
                 anchor_text, positive_text, negative_text = batch
                 z_anchor, z_positive, z_negative = self.model(anchor_text, positive_text, negative_text)
                 loss = self.criterion(z_anchor, z_positive, z_negative)
