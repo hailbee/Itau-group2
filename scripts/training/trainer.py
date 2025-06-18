@@ -3,6 +3,8 @@ import csv
 from sklearn.metrics import precision_score, recall_score, roc_curve
 from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
+from model_utils.loss.supcon_loss import SupConLoss
+from model_utils.loss.infonce_loss import InfoNCELoss
 
 class Trainer:
     """
@@ -24,15 +26,9 @@ class Trainer:
         epoch_loss = 0.0
         
         for i, batch in enumerate(dataloader):
-            if mode == "pair":
-                text1, text2, label = batch
-                label = label.to(self.device)
-                z1, z2 = self.model(text1, text2)
-                loss = self.criterion(z1, z2, label)
-            else:  # triplet
-                anchor_text, positive_text, negative_text = batch
-                z_anchor, z_positive, z_negative = self.model(anchor_text, positive_text, negative_text)
-                loss = self.criterion(z_anchor, z_positive, z_negative)
+            # Unified logic: model and criterion handle all modes
+            outputs = self.model(*batch)
+            loss = self.criterion(*outputs)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -78,7 +74,7 @@ class Trainer:
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "F1"])
+            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall"])
 
             for epoch in range(epochs):
                 # Use warmup loader if provided and in warmup phase

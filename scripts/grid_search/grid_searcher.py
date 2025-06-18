@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
+from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
+from model_utils.models.supcon import SiameseCLIPSupCon
+from model_utils.models.infonce import SiameseCLIPInfoNCE
 
 class GridSearcher:
     """
@@ -32,12 +35,22 @@ class GridSearcher:
             elif loss_type == "hybrid":
                 from model_utils.loss.triplet_losses import HybridTripletLoss
                 return HybridTripletLoss
+        elif mode == "supcon":
+            if loss_type == "supcon":
+                from model_utils.loss.supcon_loss import SupConLoss
+                return SupConLoss
+            elif loss_type == "infonce":
+                from model_utils.loss.infonce_loss import InfoNCELoss
+                return InfoNCELoss
+        elif mode == "infonce":
+            from model_utils.loss.infonce_loss import InfoNCELoss
+            return InfoNCELoss
         raise ValueError(f"Unsupported mode/loss_type combination: {mode}/{loss_type}")
 
     def search(self, reference_filepath, test_reference_filepath, test_filepath,
               lrs, batch_sizes, margins, internal_layer_sizes,
               mode="pair", loss_type="cosine", warmup_filepath=None,
-              epochs=5, warmup_epochs=5):
+              epochs=5, warmup_epochs=5, temperature=0.07):
         """
         Perform grid search over hyperparameters.
         
@@ -47,13 +60,14 @@ class GridSearcher:
             test_filepath: Path to test data
             lrs: List of learning rates to try
             batch_sizes: List of batch sizes to try
-            margins: List of margins to try
+            margins: List of margins to try (used for margin-based losses)
             internal_layer_sizes: List of internal layer sizes to try
-            mode: "pair" or "triplet"
+            mode: "pair", "triplet", "supcon", or "infonce"
             loss_type: Type of loss function to use
             warmup_filepath: Optional path to warmup data
             epochs: Number of training epochs
             warmup_epochs: Number of warmup epochs
+            temperature: Temperature parameter for SupCon/InfoNCE loss
         """
         results = []
         best_loss = float("inf")
@@ -86,8 +100,10 @@ class GridSearcher:
                         
                         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-                        # Create loss function
-                        if loss_type == "hybrid" and mode == "triplet":
+                        # Create loss function based on mode
+                        if mode in ["supcon", "infonce"]:
+                            criterion = loss_class(temperature=temperature)  # Use temperature param
+                        elif mode == "triplet" and loss_type == "hybrid":
                             criterion = loss_class(margin=margin, alpha=0.5)
                         else:
                             criterion = loss_class(margin=margin)
@@ -103,8 +119,8 @@ class GridSearcher:
                         evaluator = Evaluator(model, batch_size=batch_size)
 
                         print(f"\n--- Training config: lr={lr}, bs={batch_size}, "
-                              f"margin={margin}, size={internal_layer_size}, "
-                              f"loss={loss_type} ---")
+                              f"{'temperature' if mode in ['supcon', 'infonce'] else 'margin'}={temperature if mode in ['supcon', 'infonce'] else margin}, "
+                              f"size={internal_layer_size}, loss={loss_type} ---")
 
                         # Train model
                         model_loss = trainer.train(
@@ -129,7 +145,8 @@ class GridSearcher:
                             best_model_state = model.state_dict()
                             best_model_path = (
                                 f"{self.log_dir}/model_lr{lr}_bs{batch_size}_"
-                                f"m{margin}_ils{internal_layer_size}_{mode}_{loss_type}.pth"
+                                f"{'temp' if mode in ['supcon', 'infonce'] else 'm'}{temperature if mode in ['supcon', 'infonce'] else margin}_"
+                                f"ils{internal_layer_size}_{mode}_{loss_type}.pth"
                             )
                             torch.save(best_model_state, best_model_path)
 
@@ -138,7 +155,7 @@ class GridSearcher:
                             best_config = {
                                 "lr": lr,
                                 "batch_size": batch_size,
-                                "margin": margin,
+                                "temperature" if mode in ["supcon", "infonce"] else "margin": temperature if mode in ["supcon", "infonce"] else margin,
                                 "internal_layer_size": internal_layer_size,
                                 "best_loss": best_loss,
                                 "best_accuracy": metrics['accuracy'],
@@ -151,7 +168,7 @@ class GridSearcher:
                             "timestamp": datetime.now(),
                             "lr": lr,
                             "batch_size": batch_size,
-                            "margin": margin,
+                            "temperature" if mode in ["supcon", "infonce"] else "margin": temperature if mode in ["supcon", "infonce"] else margin,
                             "internal_layer_size": internal_layer_size,
                             "epochs": epochs,
                             "best_train_loss": best_loss,
@@ -177,12 +194,17 @@ class GridSearcher:
         if mode == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
-        else:  # triplet
+        elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
-        
-        return torch.utils.data.DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=True
-        ) 
+        elif mode == "supcon":
+            from utils.data import SupConDataset
+            dataset = SupConDataset(dataframe)
+        elif mode == "infonce":
+            from utils.data import InfoNCEDataset
+            dataset = InfoNCEDataset(dataframe)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+        from torch.utils.data import DataLoader
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4) 

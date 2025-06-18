@@ -6,6 +6,8 @@ from scripts.evaluation.evaluator import Evaluator
 from scripts.grid_search.grid_searcher import GridSearcher
 from scripts.baseline.baseline_tester import BaselineTester
 from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
+from model_utils.models.supcon import SiameseCLIPSupCon
+from model_utils.models.infonce import SiameseCLIPInfoNCE
 
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
@@ -17,9 +19,9 @@ def main():
                       help='Path to test reference data')
     parser.add_argument('--test_filepath', type=str, required=True,
                       help='Path to test data')
-    parser.add_argument('--model_type', type=str, choices=['pair', 'triplet'], default='pair',
-                      help='Model type: pair or triplet')
-    parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid'], default='cosine',
+    parser.add_argument('--model_type', type=str, choices=['pair', 'triplet', 'supcon', 'infonce'], default='pair',
+                      help='Model type: pair, triplet, supcon, or infonce')
+    parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
                       help='Loss function type')
     parser.add_argument('--warmup_filepath', type=str,
                       help='Path to warmup data (optional)')
@@ -37,6 +39,8 @@ def main():
                       help='Number of warmup epochs')
     parser.add_argument('--log_dir', type=str, default='results',
                       help='Directory to save results')
+    parser.add_argument('--temperature', type=float, default=0.07,
+                      help='Temperature parameter for SupCon/InfoNCE loss (default: 0.07)')
 
     args = parser.parse_args()
 
@@ -51,7 +55,15 @@ def main():
 
     elif args.mode == 'train':
         # Single training run
-        model_class = SiameseCLIPModelPairs if args.model_type == 'pair' else SiameseCLIPTriplet
+        if args.model_type == 'pair':
+            model_class = SiameseCLIPModelPairs
+        elif args.model_type == 'triplet':
+            model_class = SiameseCLIPTriplet
+        elif args.model_type == 'supcon':
+            model_class = SiameseCLIPSupCon
+        else:  # infonce
+            model_class = SiameseCLIPInfoNCE
+            
         model = model_class(embedding_dim=512, projection_dim=128).to(device)
         
         # Get appropriate loss class
@@ -62,16 +74,26 @@ def main():
             else:
                 from model_utils.loss.pair_losses import EuclideanLoss
                 criterion = EuclideanLoss(margin=1.0)
-        else:  # triplet
+        elif args.model_type == 'triplet':
             if args.loss_type == 'cosine':
                 from model_utils.loss.triplet_losses import CosineTripletLoss
                 criterion = CosineTripletLoss(margin=0.1)
             elif args.loss_type == 'euclidean':
                 from model_utils.loss.triplet_losses import EuclideanTripletLoss
                 criterion = EuclideanTripletLoss(margin=1.0)
-            else:  # hybrid
+            elif args.loss_type == 'hybrid':
                 from model_utils.loss.triplet_losses import HybridTripletLoss
                 criterion = HybridTripletLoss(margin=1.0, alpha=0.5)
+        elif args.model_type == 'supcon':
+            if args.loss_type == 'supcon':
+                from model_utils.loss.supcon_loss import SupConLoss
+                criterion = SupConLoss(temperature=args.temperature)
+            elif args.loss_type == 'infonce':
+                from model_utils.loss.infonce_loss import InfoNCELoss
+                criterion = InfoNCELoss(temperature=args.temperature)
+        else:  # infonce
+            from model_utils.loss.infonce_loss import InfoNCELoss
+            criterion = InfoNCELoss(temperature=args.temperature)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         
@@ -88,7 +110,15 @@ def main():
 
     elif args.mode == 'grid_search':
         # Grid search
-        model_class = SiameseCLIPModelPairs if args.model_type == 'pair' else SiameseCLIPTriplet
+        if args.model_type == 'pair':
+            model_class = SiameseCLIPModelPairs
+        elif args.model_type == 'triplet':
+            model_class = SiameseCLIPTriplet
+        elif args.model_type == 'supcon':
+            model_class = SiameseCLIPSupCon
+        else:  # infonce
+            model_class = SiameseCLIPInfoNCE
+            
         searcher = GridSearcher(model_class, device, log_dir=args.log_dir)
         
         lrs = ast.literal_eval(args.lrs)
@@ -108,7 +138,8 @@ def main():
             loss_type=args.loss_type,
             warmup_filepath=args.warmup_filepath,
             epochs=args.epochs,
-            warmup_epochs=args.warmup_epochs
+            warmup_epochs=args.warmup_epochs,
+            temperature=args.temperature
         )
         
         print("\nGrid Search Results:")
