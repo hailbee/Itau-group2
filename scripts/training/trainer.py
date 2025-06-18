@@ -43,6 +43,9 @@ class Trainer:
                     [torch.stack([self.model.encode(neg) for neg in neg_list], dim=0) for neg_list in negative_texts],
                     dim=0
                 )  # [batch_size, 3, emb_dim]
+                print("z_anchor:", z_anchor.shape)
+                print("z_positives:", z_positives.shape)
+                print("z_negatives:", z_negatives.shape)
                 loss = self.criterion(z_anchor, z_positives, z_negatives)
             elif isinstance(self.criterion, InfoNCELoss):
                 anchor_text, positive_text, negative_texts = batch
