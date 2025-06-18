@@ -1,7 +1,6 @@
 from .base import BaseSiameseCLIP
-from utils.data import ClassBalancedBatchSampler, TextPairDataset
+from utils.data import SupConDataset
 from torch.utils.data import DataLoader
-import pandas as pd
 import torch
 
 class SiameseCLIPSupCon(BaseSiameseCLIP):
@@ -15,8 +14,8 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
         
         Args:
             anchor_text: Anchor text input
-            positive_texts: List of positive text inputs
-            negative_texts: List of negative text inputs
+            positive_texts: List of positive text inputs (exactly 3)
+            negative_texts: List of negative text inputs (exactly 3)
             
         Returns:
             tuple: (z_anchor, z_positives, z_negatives) embeddings
@@ -33,21 +32,22 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
         return z_anchor, z_positives, z_negatives
 
     @staticmethod
-    def get_dataloader(dataframe, batch_size=256, n_positives=3, n_negatives=3):
+    def get_dataloader(dataframe, batch_size=256, num_workers=4):
         """
-        Returns a DataLoader with class-balanced sampling for SupCon.
-        Ensures >= n_positives per class per batch.
+        Returns a DataLoader for SupCon training with fixed numbers of positives and negatives.
         
         Args:
             dataframe: DataFrame containing the data
             batch_size: Batch size
-            n_positives: Number of positive examples per anchor
-            n_negatives: Number of negative examples per anchor
+            num_workers: Number of workers for data loading
             
         Returns:
             DataLoader: DataLoader for SupCon training
         """
-        dataset = TextPairDataset(dataframe)
-        labels = dataframe['label'].tolist()
-        sampler = ClassBalancedBatchSampler(labels, batch_size, n_positives=n_positives)
-        return DataLoader(dataset, batch_sampler=sampler) 
+        dataset = SupConDataset(dataframe, n_positives=3, n_negatives=3)
+        return DataLoader(
+            dataset, 
+            batch_size=batch_size,
+            shuffle=False,  # No shuffling to maintain order
+            num_workers=num_workers
+        ) 

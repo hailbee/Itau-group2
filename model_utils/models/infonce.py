@@ -1,7 +1,6 @@
 from .base import BaseSiameseCLIP
-from utils.data import ClassBalancedBatchSampler, TextPairDataset
+from utils.data import InfoNCEDataset
 from torch.utils.data import DataLoader
-import pandas as pd
 import torch
 
 class SiameseCLIPInfoNCE(BaseSiameseCLIP):
@@ -16,13 +15,15 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         Args:
             anchor_text: Anchor text input
             positive_text: Single positive text input
-            negative_texts: List of negative text inputs
+            negative_texts: List of negative text inputs (exactly 3)
             
         Returns:
             tuple: (z_anchor, z_positive, z_negatives) embeddings
         """
-        # Encode anchor and positive
+        # Encode anchor
         z_anchor = self.encode(anchor_text)
+        
+        # Encode positive
         z_positive = self.encode(positive_text)
         
         # Encode negatives and stack them
@@ -31,20 +32,22 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         return z_anchor, z_positive, z_negatives
 
     @staticmethod
-    def get_dataloader(dataframe, batch_size=256, n_negatives=3):
+    def get_dataloader(dataframe, batch_size=256, num_workers=4):
         """
-        Returns a DataLoader with class-balanced sampling for InfoNCE.
-        Ensures one positive and n_negatives per anchor.
+        Returns a DataLoader for InfoNCE training with fixed number of negatives.
         
         Args:
             dataframe: DataFrame containing the data
             batch_size: Batch size
-            n_negatives: Number of negative examples per anchor
+            num_workers: Number of workers for data loading
             
         Returns:
             DataLoader: DataLoader for InfoNCE training
         """
-        dataset = TextPairDataset(dataframe)
-        labels = dataframe['label'].tolist()
-        sampler = ClassBalancedBatchSampler(labels, batch_size, n_positives=1)  # Only need 1 positive for InfoNCE
-        return DataLoader(dataset, batch_sampler=sampler)
+        dataset = InfoNCEDataset(dataframe, n_negatives=3)
+        return DataLoader(
+            dataset, 
+            batch_size=batch_size,
+            shuffle=False,  # No shuffling to maintain order
+            num_workers=num_workers
+        ) 
