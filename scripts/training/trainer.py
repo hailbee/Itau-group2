@@ -3,6 +3,8 @@ import csv
 from sklearn.metrics import precision_score, recall_score, roc_curve
 from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
+from torch.utils.data import DataLoader, Subset, ConcatDataset
+import numpy as np
 
 class Trainer:
     """
@@ -51,7 +53,7 @@ class Trainer:
         return metrics
 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, cirriculum = False):
         """
         Main training loop with optional warmup.
         
@@ -80,10 +82,34 @@ class Trainer:
             writer = csv.writer(file)
             writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "F1"])
 
+            # make cirriculum string 
+            
             for epoch in range(epochs):
-                # Use warmup loader if provided and in warmup phase
-                current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
                 
+                # self pace cirriculum
+                if cirriculum == True:
+                    hard_ratio = min(0.1 * epoch, 1.0)
+                    easy_ratio = 1.0 - hard_ratio
+
+                    total_samples = len(dataloader.dataset)
+                    num_easy = int(total_samples * easy_ratio)
+                    num_hard = total_samples - num_easy
+
+                    easy_indices = np.random.choice(len(warmup_loader.dataset), num_easy, replace=False)
+                    hard_indices = np.random.choice(len(dataloader.dataset), num_hard, replace=False)
+
+                    mixed_dataset = ConcatDataset([
+                        Subset(warmup_loader.dataset, easy_indices),
+                        Subset(dataloader.dataset, hard_indices)
+                    ])
+
+                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                else:
+                    # non cirriculum mode
+                    current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader  
+
+                #############################
+
                 # Train epoch
                 avg_loss = self.train_epoch(current_loader, mode)
                 print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
