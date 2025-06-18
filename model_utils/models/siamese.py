@@ -17,4 +17,4 @@ class SiameseCLIPTriplet(BaseSiameseCLIP):
         z_anchor = self.encode(anchor_texts)
         z_positive = self.encode(positive_texts)
         z_negative = self.encode(negative_texts)
-        return z_anchor, z_positive, z_negative 
+        return z_anchor, z_positive, z_negative

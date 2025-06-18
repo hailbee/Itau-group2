@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
+from model_utils.models.supcon import SiameseCLIPSupCon
+from model_utils.models.infonce import SiameseCLIPInfoNCE
 
 class GridSearcher:
     """
@@ -32,6 +34,12 @@ class GridSearcher:
             elif loss_type == "hybrid":
                 from model_utils.loss.triplet_losses import HybridTripletLoss
                 return HybridTripletLoss
+        elif mode == "supcon":
+            from model_utils.loss.supcon_loss import SupConLoss
+            return SupConLoss
+        elif mode == "infonce":
+            from model_utils.loss.infonce_loss import InfoNCELoss
+            return InfoNCELoss
         raise ValueError(f"Unsupported mode/loss_type combination: {mode}/{loss_type}")
 
     def search(self, reference_filepath, test_reference_filepath, test_filepath,
@@ -177,9 +185,19 @@ class GridSearcher:
         if mode == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
-        else:  # triplet
+        elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
+        elif mode == "supcon":
+            if self.model_class == SiameseCLIPSupCon:
+                return self.model_class.get_dataloader(dataframe, batch_size=batch_size)
+            else:
+                raise ValueError("SupCon mode requires SiameseCLIPSupCon model")
+        else:  # infonce
+            if self.model_class == SiameseCLIPInfoNCE:
+                return self.model_class.get_dataloader(dataframe, batch_size=batch_size)
+            else:
+                raise ValueError("InfoNCE mode requires SiameseCLIPInfoNCE model")
         
         return torch.utils.data.DataLoader(
             dataset,
