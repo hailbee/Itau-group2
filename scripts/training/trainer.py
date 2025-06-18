@@ -34,13 +34,13 @@ class Trainer:
             elif isinstance(self.criterion, SupConLoss):
                 anchor_text, positive_texts, negative_texts = batch
                 z_anchor = self.model.encode(anchor_text)
-                # Encode positives and negatives per anchor
+                # Encode positives and negatives per anchor, squeeze extra dim
                 z_positives = torch.stack(
-                    [torch.stack([self.model.encode(pos) for pos in pos_list], dim=0) for pos_list in positive_texts],
+                    [torch.stack([self.model.encode(pos).squeeze(0) for pos in pos_list], dim=0) for pos_list in positive_texts],
                     dim=0
                 )  # [batch_size, 3, emb_dim]
                 z_negatives = torch.stack(
-                    [torch.stack([self.model.encode(neg) for neg in neg_list], dim=0) for neg_list in negative_texts],
+                    [torch.stack([self.model.encode(neg).squeeze(0) for neg in neg_list], dim=0) for neg_list in negative_texts],
                     dim=0
                 )  # [batch_size, 3, emb_dim]
                 print("z_anchor:", z_anchor.shape)
