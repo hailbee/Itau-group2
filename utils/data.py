@@ -46,14 +46,12 @@ class SupConDataset(Dataset):
     def __getitem__(self, idx):
         """Returns anchor, exactly 3 positives and 3 negatives"""
         anchor = self.anchor_data[idx]
-        positives = self.positive_data[idx][:3]  # Take first 3 positives
-        negatives = self.negative_data[idx][:3]  # Take first 3 negatives
+        positives = self.positive_data[idx]
+        negatives = self.negative_data[idx][:7]
         
-        # Pad if necessary
-        if len(positives) < 3:
-            positives = positives + [positives[0]] * (3 - len(positives))
-        if len(negatives) < 3:
-            negatives = negatives + [negatives[0]] * (3 - len(negatives))
+        # Pad negatives
+        if len(negatives) < 7:
+            negatives = negatives + [negatives[0]] * (7 - len(negatives))
             
         return anchor, positives, negatives
 

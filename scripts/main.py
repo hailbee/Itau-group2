@@ -39,6 +39,8 @@ def main():
                       help='Number of warmup epochs')
     parser.add_argument('--log_dir', type=str, default='results',
                       help='Directory to save results')
+    parser.add_argument('--temperature', type=float, default=0.07,
+                      help='Temperature parameter for SupCon/InfoNCE loss (default: 0.07)')
 
     args = parser.parse_args()
 
@@ -85,13 +87,13 @@ def main():
         elif args.model_type == 'supcon':
             if args.loss_type == 'supcon':
                 from model_utils.loss.supcon_loss import SupConLoss
-                criterion = SupConLoss(temperature=0.07)
+                criterion = SupConLoss(temperature=args.temperature)
             elif args.loss_type == 'infonce':
                 from model_utils.loss.infonce_loss import InfoNCELoss
-                criterion = InfoNCELoss(temperature=0.07)
+                criterion = InfoNCELoss(temperature=args.temperature)
         else:  # infonce
             from model_utils.loss.infonce_loss import InfoNCELoss
-            criterion = InfoNCELoss(temperature=0.07)
+            criterion = InfoNCELoss(temperature=args.temperature)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         
@@ -136,7 +138,8 @@ def main():
             loss_type=args.loss_type,
             warmup_filepath=args.warmup_filepath,
             epochs=args.epochs,
-            warmup_epochs=args.warmup_epochs
+            warmup_epochs=args.warmup_epochs,
+            temperature=args.temperature
         )
         
         print("\nGrid Search Results:")
