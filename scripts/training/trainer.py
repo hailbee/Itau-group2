@@ -53,7 +53,7 @@ class Trainer:
         return metrics
 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, cirriculum = False):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, cirriculum = None):
         """
         Main training loop with optional warmup.
         
@@ -82,12 +82,12 @@ class Trainer:
             writer = csv.writer(file)
             writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "F1"])
 
-            # make cirriculum string 
-            
+            # 
+
             for epoch in range(epochs):
                 
                 # self pace cirriculum
-                if cirriculum == True:
+                if cirriculum == "self":
                     hard_ratio = min(0.1 * epoch, 1.0)
                     easy_ratio = 1.0 - hard_ratio
 
