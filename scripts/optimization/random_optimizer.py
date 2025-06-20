@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
@@ -19,6 +20,9 @@ class RandomOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
         
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""
@@ -126,6 +130,11 @@ class RandomOptimizer:
             Dictionary with results
         """
         try:
+            # Convert numpy types to Python types
+            batch_size = int(params['batch_size'])
+            internal_layer_size = int(params['internal_layer_size'])
+            lr = float(params['lr'])
+            
             # Load data
             dataframe = pd.read_pickle(reference_filepath)
             warmup_dataframe = None
@@ -133,27 +142,30 @@ class RandomOptimizer:
                 warmup_dataframe = pd.read_pickle(warmup_filepath)
             
             # Create dataloaders
-            dataloader = self.create_dataloader(dataframe, params['batch_size'], mode)
+            dataloader = self.create_dataloader(dataframe, batch_size, mode)
             warmup_loader = None
             if warmup_dataframe is not None:
-                warmup_loader = self.create_dataloader(warmup_dataframe, params['batch_size'], mode)
+                warmup_loader = self.create_dataloader(warmup_dataframe, batch_size, mode)
             
             # Create model and optimizer
             model = self.model_class(
                 embedding_dim=512,
-                projection_dim=params['internal_layer_size']
+                projection_dim=internal_layer_size
             ).to(self.device)
             
-            optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'])
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
             
             # Get loss class and create criterion
             loss_class = self.get_loss_class(mode, loss_type)
             if mode in ["supcon", "infonce"]:
-                criterion = loss_class(temperature=params['temperature'])
+                temperature = float(params['temperature'])
+                criterion = loss_class(temperature=temperature)
             elif mode == "triplet" and loss_type == "hybrid":
-                criterion = loss_class(margin=params['margin'], alpha=0.5)
+                margin = float(params['margin'])
+                criterion = loss_class(margin=margin, alpha=0.5)
             else:
-                criterion = loss_class(margin=params['margin'])
+                margin = float(params['margin'])
+                criterion = loss_class(margin=margin)
             
             # Create trainer and evaluator
             trainer = Trainer(
@@ -163,7 +175,7 @@ class RandomOptimizer:
                 device=self.device,
                 log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             )
-            evaluator = Evaluator(model, batch_size=params['batch_size'])
+            evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
             model_loss = trainer.train(
@@ -185,25 +197,25 @@ class RandomOptimizer:
             # Return results
             return {
                 "timestamp": datetime.now(),
-                "lr": params['lr'],
-                "batch_size": params['batch_size'],
-                "internal_layer_size": params['internal_layer_size'],
+                "lr": lr,
+                "batch_size": batch_size,
+                "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
                 "train_loss": model_loss,
                 "test_accuracy": metrics['accuracy'],
                 "test_auc": metrics['roc_curve'][1].mean(),
                 "threshold": metrics['threshold'],
                 "loss_type": loss_type,
-                **{k: v for k, v in params.items() if k not in ['lr', 'batch_size', 'internal_layer_size']}
+                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
             }
             
         except Exception as e:
             print(f"Error in trial: {e}")
             return {
                 "timestamp": datetime.now(),
-                "lr": params.get('lr', 0),
-                "batch_size": params.get('batch_size', 0),
-                "internal_layer_size": params.get('internal_layer_size', 0),
+                "lr": float(params.get('lr', 0)),
+                "batch_size": int(params.get('batch_size', 0)),
+                "internal_layer_size": int(params.get('internal_layer_size', 0)),
                 "epochs": epochs,
                 "train_loss": float('inf'),
                 "test_accuracy": 0.0,
@@ -211,7 +223,7 @@ class RandomOptimizer:
                 "threshold": 0.0,
                 "loss_type": loss_type,
                 "error": str(e),
-                **{k: v for k, v in params.items() if k not in ['lr', 'batch_size', 'internal_layer_size']}
+                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
             }
     
     def optimize(self, reference_filepath, test_reference_filepath, test_filepath,

@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 import numpy as np
 import copy
+import os
 from datetime import datetime
 from scripts.optimization.bayesian import BayesianOptimizer
 from scripts.optimization.random_optimizer import RandomOptimizer
@@ -20,13 +21,16 @@ class UnifiedHyperparameterOptimizer:
         self.model_class = model_class
         self.device = device
         self.log_dir = log_dir
+        self.results = []
+        
+        # Create main log directory
+        os.makedirs(self.log_dir, exist_ok=True)
         
         # Initialize different optimizers
         self.bayesian_optimizer = BayesianOptimizer(model_class, device, f"{log_dir}/bayesian")
         self.random_optimizer = RandomOptimizer(model_class, device, f"{log_dir}/random")
         self.optuna_optimizer = OptunaOptimizer(model_class, device, f"{log_dir}/optuna")
         self.pbt_optimizer = PopulationBasedTrainer(model_class, device, f"{log_dir}/pbt")
-        self.results = []
     
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""

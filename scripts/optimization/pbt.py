@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import copy
+import os
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
 from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
@@ -20,6 +21,9 @@ class PopulationBasedTrainer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
         
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""

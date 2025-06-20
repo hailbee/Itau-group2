@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime
 import optuna
 from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
@@ -22,6 +23,9 @@ class OptunaOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
         
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""
@@ -256,7 +260,7 @@ class OptunaOptimizer:
             sampler=sampler_obj,
             pruner=pruner_obj,
             study_name=study_name,
-            storage=f"sqlite:///{self.log_dir}/optuna_study.db"
+            storage=None  # Use in-memory storage instead of SQLite
         )
         
         # Create objective function with fixed parameters

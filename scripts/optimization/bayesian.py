@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime
 from skopt import gp_minimize
 from skopt.space import Real, Integer, Categorical
@@ -22,6 +23,9 @@ class BayesianOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
         
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""
@@ -250,4 +254,4 @@ class BayesianOptimizer:
             "optimization_method": "bayesian"
         }
         
-        return best_config, results_df 
+        return best_config, results_df
