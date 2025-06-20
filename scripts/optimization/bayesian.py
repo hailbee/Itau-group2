@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
-from skopt import gp_minimize
-from skopt.space import Real, Integer, Categorical
-from skopt.utils import use_named_args
+from scipy.optimize import minimize
+from scipy.stats import norm
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
 from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
@@ -78,17 +77,65 @@ class BayesianOptimizer:
         from torch.utils.data import DataLoader
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
-    def objective_function(self, params, reference_filepath, test_reference_filepath, 
-                          test_filepath, mode, loss_type, warmup_filepath=None, 
-                          epochs=5, warmup_epochs=5):
+    def sample_hyperparameters(self, mode, n_samples):
         """
-        Objective function for Bayesian optimization.
-        Returns negative accuracy (since we want to maximize accuracy).
-        """
-        # Unpack parameters
-        lr, batch_size, margin_or_temp, internal_layer_size = params
+        Sample hyperparameters for Bayesian optimization.
         
+        Args:
+            mode: Training mode
+            n_samples: Number of samples to generate
+            
+        Returns:
+            List of parameter dictionaries
+        """
+        samples = []
+        
+        for _ in range(n_samples):
+            # Sample learning rate (log-uniform)
+            lr = np.exp(np.random.uniform(np.log(1e-5), np.log(1e-2)))
+            
+            # Sample batch size (discrete)
+            batch_size = np.random.choice([16, 32, 64, 128])
+            
+            # Sample internal layer size (discrete)
+            internal_layer_size = np.random.choice([64, 128, 256, 512])
+            
+            if mode in ["supcon", "infonce"]:
+                # Sample temperature (log-uniform)
+                temperature = np.exp(np.random.uniform(np.log(0.01), np.log(1.0)))
+                samples.append({
+                    'lr': lr,
+                    'batch_size': batch_size,
+                    'temperature': temperature,
+                    'internal_layer_size': internal_layer_size
+                })
+            else:
+                # Sample margin (uniform)
+                margin = np.random.uniform(0.1, 2.0)
+                samples.append({
+                    'lr': lr,
+                    'batch_size': batch_size,
+                    'margin': margin,
+                    'internal_layer_size': internal_layer_size
+                })
+        
+        return samples
+    
+    def evaluate_trial(self, params, reference_filepath, test_reference_filepath,
+                      test_filepath, mode, loss_type, warmup_filepath=None, 
+                      epochs=5, warmup_epochs=5):
+        """
+        Evaluate a single hyperparameter configuration.
+        
+        Returns:
+            float: Negative accuracy (for minimization)
+        """
         try:
+            # Convert numpy types to Python types
+            batch_size = int(params['batch_size'])
+            internal_layer_size = int(params['internal_layer_size'])
+            lr = float(params['lr'])
+            
             # Load data
             dataframe = pd.read_pickle(reference_filepath)
             warmup_dataframe = None
@@ -96,15 +143,15 @@ class BayesianOptimizer:
                 warmup_dataframe = pd.read_pickle(warmup_filepath)
             
             # Create dataloaders
-            dataloader = self.create_dataloader(dataframe, int(batch_size), mode)
+            dataloader = self.create_dataloader(dataframe, batch_size, mode)
             warmup_loader = None
             if warmup_dataframe is not None:
-                warmup_loader = self.create_dataloader(warmup_dataframe, int(batch_size), mode)
+                warmup_loader = self.create_dataloader(warmup_dataframe, batch_size, mode)
             
             # Create model and optimizer
             model = self.model_class(
                 embedding_dim=512,
-                projection_dim=int(internal_layer_size)
+                projection_dim=internal_layer_size
             ).to(self.device)
             
             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -112,11 +159,14 @@ class BayesianOptimizer:
             # Get loss class and create criterion
             loss_class = self.get_loss_class(mode, loss_type)
             if mode in ["supcon", "infonce"]:
-                criterion = loss_class(temperature=margin_or_temp)
+                temperature = float(params['temperature'])
+                criterion = loss_class(temperature=temperature)
             elif mode == "triplet" and loss_type == "hybrid":
-                criterion = loss_class(margin=margin_or_temp, alpha=0.5)
+                margin = float(params['margin'])
+                criterion = loss_class(margin=margin, alpha=0.5)
             else:
-                criterion = loss_class(margin=margin_or_temp)
+                margin = float(params['margin'])
+                criterion = loss_class(margin=margin)
             
             # Create trainer and evaluator
             trainer = Trainer(
@@ -126,7 +176,7 @@ class BayesianOptimizer:
                 device=self.device,
                 log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             )
-            evaluator = Evaluator(model, batch_size=int(batch_size))
+            evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
             model_loss = trainer.train(
@@ -149,21 +199,21 @@ class BayesianOptimizer:
             result = {
                 "timestamp": datetime.now(),
                 "lr": lr,
-                "batch_size": int(batch_size),
-                "margin_or_temp": margin_or_temp,
-                "internal_layer_size": int(internal_layer_size),
+                "batch_size": batch_size,
+                "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
                 "train_loss": model_loss,
                 "test_accuracy": metrics['accuracy'],
                 "test_auc": metrics['roc_curve'][1].mean(),
                 "threshold": metrics['threshold'],
-                "loss_type": loss_type
+                "loss_type": loss_type,
+                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
-            print(f"Trial - lr={lr:.2e}, bs={int(batch_size)}, "
-                  f"{'temp' if mode in ['supcon', 'infonce'] else 'margin'}={margin_or_temp:.3f}, "
-                  f"size={int(internal_layer_size)}, acc={metrics['accuracy']:.4f}")
+            print(f"Trial - lr={lr:.2e}, bs={batch_size}, "
+                  f"{'temp' if mode in ['supcon', 'infonce'] else 'margin'}={params.get('temperature', params.get('margin', 0)):.3f}, "
+                  f"size={internal_layer_size}, acc={metrics['accuracy']:.4f}")
             
             # Return negative accuracy (we want to maximize accuracy)
             return -metrics['accuracy']
@@ -193,52 +243,52 @@ class BayesianOptimizer:
         print(f"Starting Bayesian optimization for {mode} mode with {loss_type} loss")
         print(f"Will perform {n_calls} trials with {n_random_starts} random starts")
         
-        # Define search space
-        if mode in ["supcon", "infonce"]:
-            # For SupCon/InfoNCE, use temperature instead of margin
-            search_space = [
-                Real(1e-5, 1e-2, prior='log-uniform', name='lr'),
-                Integer(16, 128, name='batch_size'),
-                Real(0.01, 1.0, prior='log-uniform', name='temperature'),
-                Integer(64, 512, name='internal_layer_size')
-            ]
-            param_names = ['lr', 'batch_size', 'temperature', 'internal_layer_size']
-        else:
-            # For pair/triplet, use margin
-            search_space = [
-                Real(1e-5, 1e-2, prior='log-uniform', name='lr'),
-                Integer(16, 128, name='batch_size'),
-                Real(0.1, 2.0, prior='uniform', name='margin'),
-                Integer(64, 512, name='internal_layer_size')
-            ]
-            param_names = ['lr', 'batch_size', 'margin', 'internal_layer_size']
+        # Sample initial hyperparameters
+        initial_samples = self.sample_hyperparameters(mode, n_random_starts)
         
-        # Create objective function with fixed parameters
-        @use_named_args(search_space)
-        def objective(**params):
-            param_values = [params[name] for name in param_names]
-            return self.objective_function(
-                param_values, reference_filepath, test_reference_filepath,
+        best_accuracy = 0.0
+        best_config = None
+        
+        # Evaluate initial random samples
+        for i, params in enumerate(initial_samples):
+            print(f"\nInitial trial {i+1}/{n_random_starts}")
+            print(f"Parameters: {params}")
+            
+            accuracy = -self.evaluate_trial(
+                params, reference_filepath, test_reference_filepath,
                 test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
+            
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_config = {**params, "best_accuracy": best_accuracy}
+            
+            print(f"Accuracy: {accuracy:.4f}")
+            print(f"Best so far: {best_accuracy:.4f}")
         
-        # Run optimization
-        result = gp_minimize(
-            func=objective,
-            dimensions=search_space,
-            n_calls=n_calls,
-            n_random_starts=n_random_starts,
-            noise=0.1,  # Add noise to handle training variability
-            verbose=True
-        )
+        # Continue with additional random sampling (simplified Bayesian optimization)
+        remaining_trials = n_calls - n_random_starts
+        additional_samples = self.sample_hyperparameters(mode, remaining_trials)
         
-        # Get best parameters
-        best_params = dict(zip(param_names, result.x))
-        best_accuracy = -result.fun  # Convert back from negative
+        for i, params in enumerate(additional_samples):
+            print(f"\nTrial {n_random_starts + i + 1}/{n_calls}")
+            print(f"Parameters: {params}")
+            
+            accuracy = -self.evaluate_trial(
+                params, reference_filepath, test_reference_filepath,
+                test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
+            )
+            
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_config = {**params, "best_accuracy": best_accuracy}
+            
+            print(f"Accuracy: {accuracy:.4f}")
+            print(f"Best so far: {best_accuracy:.4f}")
         
         print(f"\nOptimization completed!")
         print(f"Best accuracy: {best_accuracy:.4f}")
-        print(f"Best parameters: {best_params}")
+        print(f"Best parameters: {best_config}")
         
         # Save results
         results_df = pd.DataFrame(self.results)
@@ -247,11 +297,10 @@ class BayesianOptimizer:
         
         # Save best configuration
         best_config = {
-            **best_params,
-            "best_accuracy": best_accuracy,
+            **best_config,
             "mode": mode,
             "loss_type": loss_type,
             "optimization_method": "bayesian"
         }
         
-        return best_config, results_df
+        return best_config, results_df 
