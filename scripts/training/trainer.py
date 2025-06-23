@@ -5,6 +5,7 @@ from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
 from torch.utils.data import DataLoader, Subset, ConcatDataset
 import numpy as np
+import random
 
 class Trainer:
     """
@@ -52,6 +53,7 @@ class Trainer:
         results_df, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
         return metrics
 
+    # pass in cirriculum learning parameter 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
              mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, cirriculum = None):
         """
@@ -66,6 +68,18 @@ class Trainer:
             warmup_loader: Optional warmup dataloader
             warmup_epochs: Number of warmup epochs
         """
+        # bandit learning setup 
+        datasets = {
+            "easy": warmup_loader.dataset,
+            "hard": dataloader.dataset
+        }
+
+        rewards = {k: [] for k in datasets}
+        # exploration rate
+        epsilon = 0.1 
+        # keeping track of accuracy
+        prev_accuracy = 0.0
+        
         best_metrics = {
             'accuracy': 0.0,
             'precision': 0.0,
@@ -76,17 +90,20 @@ class Trainer:
             'precision': -1,
             'recall': -1
         }
+
         best_epoch_loss = float('inf')
+
+        # bandit learning metrics
+        best_metrics = {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0}
+        best_epochs = {'accuracy': -1, 'precision': -1, 'recall': -1}
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "F1"])
 
-            # 
-
             for epoch in range(epochs):
                 
-                # self pace cirriculum
+                # self paced cirriculum learning
                 if cirriculum == "self":
                     hard_ratio = min(0.1 * epoch, 1.0)
                     easy_ratio = 1.0 - hard_ratio
@@ -104,13 +121,32 @@ class Trainer:
                     ])
 
                     current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                
+                # bandit cirriculum learning
+                elif cirriculum == "bandit":
+
+                     # Bandit curriculum learning
+                    if random.random() < epsilon:
+                        chosen_dataset_name = random.choice(["easy", "hard"])
+                    else:
+                        avg_rewards = {k: np.mean(v) if v else 0.0 for k, v in rewards.items()}
+                        chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
+
+                    chosen_dataset = warmup_loader.dataset if chosen_dataset_name == "easy" else dataloader.dataset
+                    sample_size = min(1000, len(chosen_dataset))
+                    indices = np.random.choice(len(chosen_dataset), sample_size, replace=False)
+
+                    current_loader = DataLoader(
+                        Subset(chosen_dataset, indices),
+                        batch_size=dataloader.batch_size,
+                        shuffle=True
+                    )
+
                 else:
                     # non cirriculum mode
-                    current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader  
+                    current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
 
-                #############################
-
-                # Train epoch
+                # Train 
                 avg_loss = self.train_epoch(current_loader, mode)
                 print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
 
