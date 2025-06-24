@@ -74,23 +74,10 @@ class Trainer:
             "hard": dataloader.dataset
         }
 
+        # bandit learning tracking
         rewards = {k: [] for k in datasets}
-        # exploration rate
-        epsilon = 0.1 
         # keeping track of accuracy
         prev_accuracy = 0.0
-        reward_window = 5
-        
-        best_metrics = {
-            'accuracy': 0.0,
-            'precision': 0.0,
-            'recall': 0.0
-        }
-        best_epochs = {
-            'accuracy': -1,
-            'precision': -1,
-            'recall': -1
-        }
 
         best_epoch_loss = float('inf')
 
@@ -126,12 +113,30 @@ class Trainer:
                 # bandit cirriculum learning
                 elif cirriculum == "bandit":
 
+                    # exploration rate
+                    epsilon = 0.1 
+                    reward_window = 5
+                    
+                    best_metrics = {
+                        'accuracy': 0.0,
+                        'precision': 0.0,
+                        'recall': 0.0
+                    }
+                    best_epochs = {
+                        'accuracy': -1,
+                        'precision': -1,
+                        'recall': -1
+                    }
+
                      # Bandit curriculum learning
                     if random.random() < epsilon:
                         chosen_dataset_name = random.choice(["easy", "hard"])
                     else:
                         # reward estimation
-                        avg_rewards = {k: np.mean(v) if v else 0.0 for k, v in rewards.items()}
+                        avg_rewards = {
+                            k: np.mean(v[-reward_window:]) if v else 0.0
+                            for k, v in rewards.items()
+                        }
                         chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
 
                     easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
@@ -161,6 +166,11 @@ class Trainer:
 
                 # Evaluate
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
+
+                if cirriculum == "bandit":
+                    delta_acc = metrics['accuracy'] - prev_accuracy
+                    prev_accuracy = metrics['accuracy']
+                    rewards[chosen_dataset_name].append(delta_acc)
                 
                 # Log metrics
                 writer.writerow([
