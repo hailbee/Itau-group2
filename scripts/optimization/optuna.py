@@ -23,6 +23,7 @@ class OptunaOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -197,8 +198,16 @@ class OptunaOptimizer:
             }
             self.results.append(result)
             
+            # Track best AUC
+            current_auc = metrics['roc_curve'][1].mean()
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {trial.number}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {trial.number}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
+            
             # Report intermediate value for pruning
-            trial.report(metrics['accuracy'], epoch=epochs)
+            trial.report(metrics['accuracy'], epochs)
             
             return metrics['accuracy']
             
@@ -286,6 +295,13 @@ class OptunaOptimizer:
         results_df = pd.DataFrame(self.results)
         results_df.to_csv(f"{self.log_dir}/optuna_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                          index=False)
+        
+        # Print best AUC
+        if not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
         
         # Save study
         study_path = f"{self.log_dir}/optuna_study_{study_name}.pkl"

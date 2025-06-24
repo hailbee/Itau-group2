@@ -187,6 +187,13 @@ class GridSearcher:
         print("\nOverall Best config based on max test accuracy:")
         print(best_config)
 
+        # Print best AUC
+        if not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
+
         return best_config, results_df
 
     def create_dataloader(self, dataframe, batch_size, mode):

@@ -21,6 +21,7 @@ class PopulationBasedTrainer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all generations
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -338,11 +339,18 @@ class PopulationBasedTrainer:
                         device=self.device,
                         log_csv_path=f"{self.log_dir}/pbt_training_log_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                     )
+            
+            # Update best AUC
+            current_auc = max(result['test_auc'] for result in generation_results)
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"New best AUC: {self.best_auc:.4f}")
         
         # Find best model
         best_result = max(self.results, key=lambda x: x['accuracy'])
         best_config = {k: v for k, v in best_result.items() if k not in ['generation', 'model_id', 'timestamp', 'accuracy', 'train_loss', 'test_auc', 'threshold']}
         best_config['best_accuracy'] = best_result['accuracy']
+        best_config['best_auc'] = self.best_auc
         
         print(f"\nPBT completed!")
         print(f"Best accuracy: {best_result['accuracy']:.4f}")

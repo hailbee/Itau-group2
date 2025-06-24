@@ -22,6 +22,7 @@ class BayesianOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -207,15 +208,18 @@ class BayesianOptimizer:
                 "test_auc": metrics['roc_curve'][1].mean(),
                 "threshold": metrics['threshold'],
                 "loss_type": loss_type,
-                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
+                **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
-            print(f"Trial - lr={lr:.2e}, bs={batch_size}, "
-                  f"{'temp' if mode in ['supcon', 'infonce'] else 'margin'}={params.get('temperature', params.get('margin', 0)):.3f}, "
-                  f"size={internal_layer_size}, acc={metrics['accuracy']:.4f}")
+            # Track best AUC
+            current_auc = metrics['roc_curve'][1].mean()
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
-            # Return negative accuracy (we want to maximize accuracy)
             return -metrics['accuracy']
             
         except Exception as e:

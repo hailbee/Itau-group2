@@ -20,6 +20,7 @@ class RandomOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -206,7 +207,7 @@ class RandomOptimizer:
                 "test_auc": metrics['roc_curve'][1].mean(),
                 "threshold": metrics['threshold'],
                 "loss_type": loss_type,
-                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
+                **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             
         except Exception as e:
@@ -268,6 +269,14 @@ class RandomOptimizer:
             if result['test_accuracy'] > best_accuracy:
                 best_accuracy = result['test_accuracy']
                 best_config = {**params, "best_accuracy": best_accuracy}
+            
+            # Track best AUC
+            current_auc = result['test_auc']
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {i+1}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {i+1}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
             print(f"Accuracy: {result['test_accuracy']:.4f}")
             print(f"Best so far: {best_accuracy:.4f}")
