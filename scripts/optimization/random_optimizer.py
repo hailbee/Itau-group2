@@ -177,10 +177,9 @@ class RandomOptimizer:
                 device=self.device,
                 log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             )
-            evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -190,12 +189,6 @@ class RandomOptimizer:
                 warmup_epochs=warmup_epochs
             )
             
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
-            )
-            
             # Return results
             return {
                 "timestamp": datetime.now(),
@@ -203,10 +196,10 @@ class RandomOptimizer:
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_auc'],
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }

@@ -164,7 +164,7 @@ class OptunaOptimizer:
             evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -172,12 +172,6 @@ class OptunaOptimizer:
                 epochs=epochs,
                 warmup_loader=warmup_loader,
                 warmup_epochs=warmup_epochs
-            )
-            
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
             )
             
             # Log results
@@ -190,17 +184,17 @@ class OptunaOptimizer:
                 "optimizer": optimizer_name,
                 "weight_decay": weight_decay,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_auc'],
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
             # Track best AUC
-            current_auc = metrics['roc_auc']
+            current_auc = best_metrics['roc_auc']
             if current_auc > self.best_auc:
                 self.best_auc = current_auc
                 print(f"Trial {trial.number}: New best AUC = {self.best_auc:.4f}")
@@ -208,7 +202,7 @@ class OptunaOptimizer:
                 print(f"Trial {trial.number}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
             # Track best accuracy
-            current_accuracy = metrics['accuracy']
+            current_accuracy = best_metrics['accuracy']
             if current_accuracy > self.best_accuracy:
                 self.best_accuracy = current_accuracy
                 print(f"Trial {trial.number}: New best accuracy = {self.best_accuracy:.4f}")
@@ -216,9 +210,9 @@ class OptunaOptimizer:
                 print(f"Trial {trial.number}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
             
             # Report intermediate value for pruning
-            trial.report(metrics['accuracy'], epochs)
+            trial.report(best_metrics['accuracy'], epochs)
             
-            return metrics['accuracy']
+            return best_metrics['accuracy']
             
         except Exception as e:
             print(f"Error in trial {trial.number}: {e}")

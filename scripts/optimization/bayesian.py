@@ -181,7 +181,7 @@ class BayesianOptimizer:
             evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -191,12 +191,6 @@ class BayesianOptimizer:
                 warmup_epochs=warmup_epochs
             )
             
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
-            )
-            
             # Log results
             result = {
                 "timestamp": datetime.now(),
@@ -204,17 +198,17 @@ class BayesianOptimizer:
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_auc'],
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
             # Track best AUC
-            current_auc = metrics['roc_auc']
+            current_auc = best_metrics['roc_auc']
             if current_auc > self.best_auc:
                 self.best_auc = current_auc
                 print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
@@ -222,14 +216,14 @@ class BayesianOptimizer:
                 print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
             # Track best accuracy
-            current_accuracy = metrics['accuracy']
+            current_accuracy = best_metrics['accuracy']
             if current_accuracy > self.best_accuracy:
                 self.best_accuracy = current_accuracy
                 print(f"Trial {len(self.results)}: New best accuracy = {self.best_accuracy:.4f}")
             else:
                 print(f"Trial {len(self.results)}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
             
-            return -metrics['accuracy']
+            return -best_metrics['accuracy']
             
         except Exception as e:
             print(f"Error in trial: {e}")

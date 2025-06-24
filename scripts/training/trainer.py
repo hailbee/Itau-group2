@@ -59,16 +59,21 @@ class Trainer:
             epochs: Number of training epochs
             warmup_loader: Optional warmup dataloader
             warmup_epochs: Number of warmup epochs
+            
+        Returns:
+            dict: Best metrics achieved during training
         """
         best_metrics = {
             'accuracy': 0.0,
             'precision': 0.0,
-            'recall': 0.0
+            'recall': 0.0,
+            'roc_auc': 0.0
         }
         best_epochs = {
             'accuracy': -1,
             'precision': -1,
-            'recall': -1
+            'recall': -1,
+            'roc_auc': -1
         }
         best_epoch_loss = float('inf')
 
@@ -106,15 +111,20 @@ class Trainer:
                       f"AUC: {metrics.get('roc_auc', float('nan')):.4f}")
 
                 # Track best metrics
-                for metric in ['accuracy', 'precision', 'recall']:
-                    if metrics[metric] > best_metrics[metric]:
+                for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
+                    if metric in metrics and metrics[metric] > best_metrics[metric]:
                         best_metrics[metric] = metrics[metric]
                         best_epochs[metric] = epoch + 1
 
         # Print summary
         print("\n=== Best Epochs Summary ===")
-        for metric in ['accuracy', 'precision', 'recall']:
-            print(f"Best {metric.capitalize()}: {best_metrics[metric]:.4f} "
-                  f"at epoch {best_epochs[metric]}")
+        for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
+            if best_epochs[metric] != -1:
+                print(f"Best {metric.capitalize()}: {best_metrics[metric]:.4f} "
+                      f"at epoch {best_epochs[metric]}")
+        print(f"Best Loss: {best_epoch_loss:.4f}")
 
-        return best_epoch_loss 
+        # Add loss to best_metrics
+        best_metrics['loss'] = best_epoch_loss
+
+        return best_metrics 

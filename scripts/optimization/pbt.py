@@ -279,7 +279,7 @@ class PopulationBasedTrainer:
                 print(f"Training model {i+1}/{len(models)} with params: {population[i]}")
                 
                 # Train model
-                model_loss = trainer.train(
+                best_metrics = trainer.train(
                     dataloader=dataloader,
                     test_reference_filepath=test_reference_filepath,
                     test_filepath=test_filepath,
@@ -289,26 +289,20 @@ class PopulationBasedTrainer:
                     warmup_epochs=warmup_epochs if generation == 0 else 0
                 )
                 
-                # Evaluate model
-                results_df, metrics = evaluators[i].evaluate(
-                    test_reference_filepath,
-                    test_filepath
-                )
-                
                 result = {
                     "generation": generation + 1,
                     "model_id": i,
                     "timestamp": datetime.now(),
-                    "accuracy": metrics['accuracy'],
-                    "train_loss": model_loss,
-                    "test_auc": metrics['roc_auc'],
-                    "threshold": metrics['threshold'],
+                    "accuracy": best_metrics['accuracy'],
+                    "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                    "test_auc": best_metrics['roc_auc'],
+                    "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                     **population[i]
                 }
                 generation_results.append(result)
                 self.results.append(result)
                 
-                print(f"Model {i+1} accuracy: {metrics['accuracy']:.4f}")
+                print(f"Model {i+1} accuracy: {best_metrics['accuracy']:.4f}")
             
             # Evolution step
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:
