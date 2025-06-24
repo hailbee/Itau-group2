@@ -172,7 +172,7 @@ class GridSearcher:
                             "internal_layer_size": internal_layer_size,
                             "epochs": epochs,
                             "best_train_loss": best_loss,
-                            "test_auc": metrics['roc_curve'][1].mean(),  # Mean TPR
+                            "test_auc": metrics['roc_auc'],
                             "test_youden_threshold": metrics['threshold'],
                             "test_best_accuracy": metrics['accuracy'],
                             "test_accuracy_threshold": metrics['threshold'],

@@ -204,7 +204,7 @@ class RandomOptimizer:
                 "epochs": epochs,
                 "train_loss": model_loss,
                 "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_curve'][1].mean(),
+                "test_auc": metrics['roc_auc'],
                 "threshold": metrics['threshold'],
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}

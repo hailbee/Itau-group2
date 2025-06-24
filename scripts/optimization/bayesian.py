@@ -205,7 +205,7 @@ class BayesianOptimizer:
                 "epochs": epochs,
                 "train_loss": model_loss,
                 "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_curve'][1].mean(),
+                "test_auc": metrics['roc_auc'],
                 "threshold": metrics['threshold'],
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
@@ -213,7 +213,7 @@ class BayesianOptimizer:
             self.results.append(result)
             
             # Track best AUC
-            current_auc = metrics['roc_curve'][1].mean()
+            current_auc = metrics['roc_auc']
             if current_auc > self.best_auc:
                 self.best_auc = current_auc
                 print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
