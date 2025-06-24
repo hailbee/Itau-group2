@@ -22,6 +22,7 @@ class PopulationBasedTrainer:
         self.log_dir = log_dir
         self.results = []
         self.best_auc = 0.0  # Track best AUC across all generations
+        self.best_accuracy = 0.0  # Track best accuracy across all generations
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -345,6 +346,14 @@ class PopulationBasedTrainer:
             if current_auc > self.best_auc:
                 self.best_auc = current_auc
                 print(f"New best AUC: {self.best_auc:.4f}")
+            
+            # Update best accuracy
+            current_accuracy = max(result['accuracy'] for result in generation_results)
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"New best accuracy: {self.best_accuracy:.4f}")
+            
+            print(f"Generation {generation + 1}: Best AUC = {self.best_auc:.4f}, Best Accuracy = {self.best_accuracy:.4f}")
         
         # Find best model
         best_result = max(self.results, key=lambda x: x['accuracy'])

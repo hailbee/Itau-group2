@@ -72,6 +72,7 @@ class GridSearcher:
         results = []
         best_loss = float("inf")
         best_acc = 0
+        best_auc = 0.0
         best_config = {}
 
         # Load data
@@ -162,6 +163,15 @@ class GridSearcher:
                                 "threshold": metrics['threshold'],
                                 "loss_type": loss_type
                             }
+
+                        # Track best AUC
+                        current_auc = metrics['roc_auc']
+                        if current_auc > best_auc:
+                            best_auc = current_auc
+                            print(f"New best AUC: {best_auc:.4f}")
+                        
+                        print(f"Config: lr={lr}, bs={batch_size}, {'temp' if mode in ['supcon', 'infonce'] else 'margin'}={temperature if mode in ['supcon', 'infonce'] else margin}, size={internal_layer_size}")
+                        print(f"Accuracy: {metrics['accuracy']:.4f} (Best: {best_acc:.4f}), AUC: {current_auc:.4f} (Best: {best_auc:.4f})")
 
                         # Log results
                         results.append({

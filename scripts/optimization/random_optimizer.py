@@ -279,7 +279,8 @@ class RandomOptimizer:
                 print(f"Trial {i+1}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
             print(f"Accuracy: {result['test_accuracy']:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Save results
         results_df = pd.DataFrame(self.results)

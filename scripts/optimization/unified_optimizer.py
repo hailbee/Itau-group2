@@ -23,6 +23,7 @@ class UnifiedHyperparameterOptimizer:
         self.log_dir = log_dir
         self.results = []
         self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create main log directory
         os.makedirs(self.log_dir, exist_ok=True)
@@ -327,6 +328,14 @@ class UnifiedHyperparameterOptimizer:
                     print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
                 else:
                     print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
+                
+                # Track best accuracy
+                current_accuracy = metrics['accuracy']
+                if current_accuracy > self.best_accuracy:
+                    self.best_accuracy = current_accuracy
+                    print(f"Trial {len(self.results)}: New best accuracy = {self.best_accuracy:.4f}")
+                else:
+                    print(f"Trial {len(self.results)}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
                 
                 result = {
                     "generation": generation + 1,

@@ -268,7 +268,8 @@ class BayesianOptimizer:
                 best_config = {**params, "best_accuracy": best_accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Continue with additional random sampling (simplified Bayesian optimization)
         remaining_trials = n_calls - n_random_starts
@@ -288,7 +289,8 @@ class BayesianOptimizer:
                 best_config = {**params, "best_accuracy": best_accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         print(f"\nOptimization completed!")
         print(f"Best accuracy: {best_accuracy:.4f}")
