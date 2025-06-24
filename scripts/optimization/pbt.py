@@ -301,7 +301,7 @@ class PopulationBasedTrainer:
                     "timestamp": datetime.now(),
                     "accuracy": metrics['accuracy'],
                     "train_loss": model_loss,
-                    "test_auc": metrics['roc_curve'][1].mean(),
+                    "test_auc": metrics['roc_auc'],
                     "threshold": metrics['threshold'],
                     **population[i]
                 }

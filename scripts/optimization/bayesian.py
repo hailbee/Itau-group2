@@ -23,6 +23,7 @@ class BayesianOptimizer:
         self.log_dir = log_dir
         self.results = []
         self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -220,6 +221,14 @@ class BayesianOptimizer:
             else:
                 print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
+            # Track best accuracy
+            current_accuracy = metrics['accuracy']
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"Trial {len(self.results)}: New best accuracy = {self.best_accuracy:.4f}")
+            else:
+                print(f"Trial {len(self.results)}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
+            
             return -metrics['accuracy']
             
         except Exception as e:
@@ -250,7 +259,6 @@ class BayesianOptimizer:
         # Sample initial hyperparameters
         initial_samples = self.sample_hyperparameters(mode, n_random_starts)
         
-        best_accuracy = 0.0
         best_config = None
         
         # Evaluate initial random samples
@@ -263,12 +271,11 @@ class BayesianOptimizer:
                 test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if accuracy > self.best_accuracy:
+                best_config = {**params, "best_accuracy": accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
             print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Continue with additional random sampling (simplified Bayesian optimization)
@@ -284,16 +291,15 @@ class BayesianOptimizer:
                 test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if accuracy > self.best_accuracy:
+                best_config = {**params, "best_accuracy": accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
             print(f"Best AUC so far: {self.best_auc:.4f}")
         
         print(f"\nOptimization completed!")
-        print(f"Best accuracy: {best_accuracy:.4f}")
+        print(f"Best accuracy: {self.best_accuracy:.4f}")
         print(f"Best parameters: {best_config}")
         
         # Save results

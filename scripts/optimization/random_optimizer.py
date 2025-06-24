@@ -21,6 +21,7 @@ class RandomOptimizer:
         self.log_dir = log_dir
         self.results = []
         self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -250,7 +251,6 @@ class RandomOptimizer:
         # Sample hyperparameters
         trials = self.sample_hyperparameters(mode, n_trials)
         
-        best_accuracy = 0.0
         best_config = None
         
         # Evaluate each trial
@@ -266,9 +266,8 @@ class RandomOptimizer:
             self.results.append(result)
             
             # Track best result
-            if result['test_accuracy'] > best_accuracy:
-                best_accuracy = result['test_accuracy']
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if result['test_accuracy'] > self.best_accuracy:
+                best_config = {**params, "best_accuracy": result['test_accuracy']}
             
             # Track best AUC
             current_auc = result['test_auc']
@@ -278,8 +277,16 @@ class RandomOptimizer:
             else:
                 print(f"Trial {i+1}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
+            # Track best accuracy
+            current_accuracy = result['test_accuracy']
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"Trial {i+1}: New best accuracy = {self.best_accuracy:.4f}")
+            else:
+                print(f"Trial {i+1}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
+            
             print(f"Accuracy: {result['test_accuracy']:.4f}")
-            print(f"Best accuracy so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
             print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Save results
@@ -288,7 +295,6 @@ class RandomOptimizer:
                          index=False)
         
         print(f"\nRandom search completed!")
-        print(f"Best accuracy: {best_accuracy:.4f}")
         print(f"Best configuration: {best_config}")
         
         return best_config, results_df 
