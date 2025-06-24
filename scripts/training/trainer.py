@@ -74,7 +74,7 @@ class Trainer:
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall"])
+            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC"])
 
             for epoch in range(epochs):
                 # Use warmup loader if provided and in warmup phase
@@ -96,12 +96,14 @@ class Trainer:
                     avg_loss, 
                     metrics['accuracy'], 
                     metrics['precision'], 
-                    metrics['recall']
+                    metrics['recall'],
+                    metrics.get('roc_auc', None)
                 ])
 
                 print(f"Epoch {epoch+1} - Test Accuracy: {metrics['accuracy']:.4f} | "
                       f"Precision: {metrics['precision']:.4f} | "
-                      f"Recall: {metrics['recall']:.4f}")
+                      f"Recall: {metrics['recall']:.4f} | "
+                      f"AUC: {metrics.get('roc_auc', float('nan')):.4f}")
 
                 # Track best metrics
                 for metric in ['accuracy', 'precision', 'recall']:

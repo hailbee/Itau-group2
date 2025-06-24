@@ -36,7 +36,7 @@ class SupConDataset(Dataset):
             dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (list of positives),
                       'negative_name' (list of negatives)
         """
-        self.anchor_data = dataframe['real_name'].tolist()
+        self.anchor_data = dataframe['anchor_name'].tolist()
         self.positive_data = dataframe['positive_names'].tolist()  # Should be list of lists
         self.negative_data = dataframe['negative_names'].tolist()  # Should be list of lists
 
