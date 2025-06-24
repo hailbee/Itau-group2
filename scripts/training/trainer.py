@@ -79,6 +79,7 @@ class Trainer:
         epsilon = 0.1 
         # keeping track of accuracy
         prev_accuracy = 0.0
+        reward_window = 5
         
         best_metrics = {
             'accuracy': 0.0,
@@ -129,18 +130,23 @@ class Trainer:
                     if random.random() < epsilon:
                         chosen_dataset_name = random.choice(["easy", "hard"])
                     else:
+                        # reward estimation
                         avg_rewards = {k: np.mean(v) if v else 0.0 for k, v in rewards.items()}
                         chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
 
-                    chosen_dataset = warmup_loader.dataset if chosen_dataset_name == "easy" else dataloader.dataset
-                    sample_size = min(1000, len(chosen_dataset))
-                    indices = np.random.choice(len(chosen_dataset), sample_size, replace=False)
+                    easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
+                    hard_batch_size = dataloader.batch_size - easy_batch_size
 
-                    current_loader = DataLoader(
-                        Subset(chosen_dataset, indices),
-                        batch_size=dataloader.batch_size,
-                        shuffle=True
-                    )
+                    easy_indices = np.random.choice(len(warmup_loader.dataset), easy_batch_size, replace=False)
+                    hard_indices = np.random.choice(len(dataloader.dataset), hard_batch_size, replace=False)
+
+                    mixed_dataset = ConcatDataset([
+                        Subset(warmup_loader.dataset, easy_indices),
+                        Subset(dataloader.dataset, hard_indices)
+                    ])
+
+                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                    mix_desc = f"bandit (chose {chosen_dataset_name})"
 
                 else:
                     # non cirriculum mode
