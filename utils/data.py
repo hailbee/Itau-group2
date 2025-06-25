@@ -28,31 +28,114 @@ class TripletDataset(Dataset):
         return self.anchor_data[idx], self.positive_data[idx], self.negative_data[idx]
 
 class SupConDataset(Dataset):
-    def __init__(self, dataframe):
+    def __init__(self, dataframe, max_positives=3, max_negatives=7):
         """
         Dataset for SupCon that handles multiple positives and negatives per anchor.
-        Each anchor should have exactly 3 positives and 7 negatives.
+        Automatically adapts to consistent or inconsistent positive/negative counts.
         
         Args:
             dataframe: DataFrame with columns 'real_name' (anchor), 'positive_names' (list of positives),
                       'negative_names' (list of negatives)
+            max_positives: Maximum number of positives to use per sample (default: 3)
+            max_negatives: Maximum number of negatives to use per sample (default: 7)
         """
-        self.anchor_data = dataframe['anchor_name'].tolist()
-        self.positive_data = dataframe['positive_names'].tolist()  # Should be list of lists
-        self.negative_data = dataframe['negative_names'].tolist()  # Should be list of lists
+        self.anchor_data = dataframe['real_name'].tolist()
+        
+        # Handle positive_names - they might be string representations of lists
+        raw_positive_data = dataframe['positive_names'].tolist()
+        self.positive_data = []
+        for pos_item in raw_positive_data:
+            if isinstance(pos_item, str):
+                # Parse string representation of list
+                try:
+                    pos_list = ast.literal_eval(pos_item)
+                    if isinstance(pos_list, list):
+                        self.positive_data.append(pos_list)
+                    else:
+                        # If it's not a list, treat as single item
+                        self.positive_data.append([pos_item])
+                except (ValueError, SyntaxError):
+                    # If parsing fails, treat as single item
+                    self.positive_data.append([pos_item])
+            else:
+                # Already a list
+                self.positive_data.append(pos_item)
+        
+        # Handle negative_names - they might be string representations of lists
+        raw_negative_data = dataframe['negative_names'].tolist()
+        self.negative_data = []
+        for neg_item in raw_negative_data:
+            if isinstance(neg_item, str):
+                # Parse string representation of list
+                try:
+                    neg_list = ast.literal_eval(neg_item)
+                    if isinstance(neg_list, list):
+                        self.negative_data.append(neg_list)
+                    else:
+                        # If it's not a list, treat as single item
+                        self.negative_data.append([neg_item])
+                except (ValueError, SyntaxError):
+                    # If parsing fails, treat as single item
+                    self.negative_data.append([neg_item])
+            else:
+                # Already a list
+                self.negative_data.append(neg_item)
+        
+        # Check if all samples have the same number of positives and negatives
+        pos_lengths = [len(pos_list) for pos_list in self.positive_data]
+        neg_lengths = [len(neg_list) for neg_list in self.negative_data]
+        unique_pos_lengths = set(pos_lengths)
+        unique_neg_lengths = set(neg_lengths)
+        
+        if len(unique_pos_lengths) == 1 and len(unique_neg_lengths) == 1:
+            # All samples have the same number of positives and negatives
+            self.consistent_positives = True
+            self.consistent_negatives = True
+            self.n_positives = list(unique_pos_lengths)[0]
+            self.n_negatives = list(unique_neg_lengths)[0]
+            print(f"SupConDataset: Consistent counts detected. All samples have {self.n_positives} positives and {self.n_negatives} negatives.")
+        else:
+            # Inconsistent counts
+            self.consistent_positives = len(unique_pos_lengths) == 1
+            self.consistent_negatives = len(unique_neg_lengths) == 1
+            self.n_positives = max_positives
+            self.n_negatives = max_negatives
+            print(f"SupConDataset: Inconsistent counts detected. Using max_positives={max_positives}, max_negatives={max_negatives}.")
+            print(f"Positive count range: {min(unique_pos_lengths)} to {max(unique_pos_lengths)}")
+            print(f"Negative count range: {min(unique_neg_lengths)} to {max(unique_neg_lengths)}")
 
     def __len__(self):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        """Returns anchor, exactly 3 positives and 7 negatives"""
+        """Returns anchor, positives, and negatives (adapted to dataset type)"""
         anchor = self.anchor_data[idx]
         positives = self.positive_data[idx]
-        negatives = self.negative_data[idx][:7]  # Take first 7 negatives
+        negatives = self.negative_data[idx]
         
-        # Pad negatives if necessary
-        if len(negatives) < 7:
-            negatives = negatives + [negatives[0]] * (7 - len(negatives))
+        # Handle positives
+        if self.consistent_positives:
+            # Use all positives as-is
+            pass
+        else:
+            # Pad or truncate to max_positives
+            if len(positives) >= self.n_positives:
+                positives = positives[:self.n_positives]  # Truncate
+            else:
+                # Pad by repeating the first positive
+                positives = positives + [positives[0]] * (self.n_positives - len(positives))
+        
+        # Handle negatives
+        if self.consistent_negatives:
+            # Use all negatives as-is
+            pass
+        else:
+            # Pad or truncate to max_negatives
+            if len(negatives) >= self.n_negatives:
+                negatives = negatives[:self.n_negatives]  # Truncate
+            else:
+                # Pad by repeating the first negative
+                negatives = negatives + [negatives[0]] * (self.n_negatives - len(negatives))
             
         return anchor, positives, negatives
 
