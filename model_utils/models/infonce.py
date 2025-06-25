@@ -16,14 +16,16 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
             positive_text: list of positive text strings, len=batch_size
             negative_texts: list of list of negative text strings, shape [batch_size, n_negatives]
         Returns:
-            tuple: (z_anchor, z_positive, z_negatives) embeddings
+            tuple: (z_anchor, z_positives, z_negatives) embeddings
         """
         # Encode anchors
         z_anchor = self.encode(anchor_text)  # [batch_size, emb_dim]
         # Encode positives
         z_positive = self.encode(positive_text)  # [batch_size, emb_dim]
+        # Reshape positive to 3D tensor: [batch_size, 1, emb_dim]
+        z_positives = z_positive.unsqueeze(1)  # [batch_size, 1, emb_dim]
         # Encode negatives
         z_negatives = torch.stack([
             self.encode(neg_list) for neg_list in negative_texts
         ], dim=0)  # [batch_size, n_negatives, emb_dim]
-        return z_anchor, z_positive, z_negatives
+        return z_anchor, z_positives, z_negatives

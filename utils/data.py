@@ -30,13 +30,13 @@ class SupConDataset(Dataset):
     def __init__(self, dataframe):
         """
         Dataset for SupCon that handles multiple positives and negatives per anchor.
-        Each anchor should have exactly 3 positives and 3 negatives.
+        Each anchor should have exactly 3 positives and 7 negatives.
         
         Args:
-            dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (list of positives),
-                      'negative_name' (list of negatives)
+            dataframe: DataFrame with columns 'real_name' (anchor), 'positive_names' (list of positives),
+                      'negative_names' (list of negatives)
         """
-        self.anchor_data = dataframe['anchor_name'].tolist()
+        self.anchor_data = dataframe['real_name'].tolist()
         self.positive_data = dataframe['positive_names'].tolist()  # Should be list of lists
         self.negative_data = dataframe['negative_names'].tolist()  # Should be list of lists
 
@@ -44,12 +44,12 @@ class SupConDataset(Dataset):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        """Returns anchor, exactly 3 positives and 3 negatives"""
+        """Returns anchor, exactly 3 positives and 7 negatives"""
         anchor = self.anchor_data[idx]
         positives = self.positive_data[idx]
-        negatives = self.negative_data[idx][:7]
+        negatives = self.negative_data[idx][:7]  # Take first 7 negatives
         
-        # Pad negatives
+        # Pad negatives if necessary
         if len(negatives) < 7:
             negatives = negatives + [negatives[0]] * (7 - len(negatives))
             
