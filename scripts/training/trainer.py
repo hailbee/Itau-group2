@@ -3,14 +3,11 @@ import csv
 from sklearn.metrics import precision_score, recall_score, roc_curve
 from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
-<<<<<<< HEAD
 from torch.utils.data import DataLoader, Subset, ConcatDataset
 import numpy as np
 import random
-=======
 from model_utils.loss.supcon_loss import SupConLoss
 from model_utils.loss.infonce_loss import InfoNCELoss
->>>>>>> origin/main
 
 class Trainer:
     """
