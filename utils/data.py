@@ -39,7 +39,7 @@ class SupConDataset(Dataset):
             max_positives: Maximum number of positives to use per sample (default: 3)
             max_negatives: Maximum number of negatives to use per sample (default: 7)
         """
-        self.anchor_data = dataframe['real_name'].tolist()
+        self.anchor_data = dataframe['anchor_name'].tolist()
         
         # Handle positive_names - they might be string representations of lists
         raw_positive_data = dataframe['positive_names'].tolist()
