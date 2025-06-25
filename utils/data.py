@@ -34,8 +34,7 @@ class SupConDataset(Dataset):
         Automatically adapts to consistent or inconsistent positive/negative counts.
         
         Args:
-            dataframe: DataFrame with columns 'real_name' (anchor), 'positive_names' (list of positives),
-                      'negative_names' (list of negatives)
+            dataframe: DataFrame with columns ['anchor_name', 'positive_names', 'negative_names']
             max_positives: Maximum number of positives to use per sample (default: 3)
             max_negatives: Maximum number of negatives to use per sample (default: 7)
         """
