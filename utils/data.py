@@ -59,11 +59,11 @@ class InfoNCEDataset(Dataset):
     def __init__(self, dataframe):
         """
         Dataset for InfoNCE that handles one positive and multiple negatives per anchor.
-        Each anchor should have exactly 1 positive and 3 negatives.
+        Each anchor should have exactly 1 positive and 6 negatives.
         
         Args:
-            dataframe: DataFrame with columns 'fraud_name' (anchor), 'real_name' (positive),
-                      'negative_name' (list of negatives)
+            dataframe: DataFrame with columns 'anchor_name' (anchor), 'positive_name' (positive),
+                      'negative_names' (list of negatives)
         """
         self.anchor_data = dataframe['anchor_name'].tolist()
         self.positive_data = dataframe['positive_name'].tolist()
@@ -73,13 +73,13 @@ class InfoNCEDataset(Dataset):
         return len(self.anchor_data)
 
     def __getitem__(self, idx):
-        """Returns anchor, one positive, and exactly 3 negatives"""
+        """Returns anchor, one positive, and exactly 6 negatives"""
         anchor = self.anchor_data[idx]
         positive = self.positive_data[idx]
-        negatives = self.negative_data[idx][:3]  # Take first 3 negatives
+        negatives = self.negative_data[idx][:6]  # Take first 6 negatives
         
         # Pad if necessary
-        if len(negatives) < 3:
-            negatives = negatives + [negatives[0]] * (3 - len(negatives))
+        if len(negatives) < 6:
+            negatives = negatives + [negatives[0]] * (6 - len(negatives))
             
         return anchor, positive, negatives
