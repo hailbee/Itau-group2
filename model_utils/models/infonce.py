@@ -14,7 +14,7 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         Args:
             anchor_text: list of anchor text strings, len=batch_size
             positive_text: list of positive text strings, len=batch_size
-            negative_texts: tuple of lists of negative text strings, shape [batch_size, n_negatives]
+            negative_texts: list of tuples of negative text strings, shape [n_negatives, batch_size]
         Returns:
             tuple: (z_anchor, z_positives, z_negatives) embeddings
         """
@@ -32,16 +32,16 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         z_positive = self.encode(positive_text)  # [batch_size, emb_dim]
         z_positives = z_positive.unsqueeze(1)  # [batch_size, 1, emb_dim]
         # Encode negatives
-        # negative_texts is a tuple of lists: ([neg1_sample1, neg2_sample1, ...], [neg1_sample2, neg2_sample2, ...], ...)
+        # negative_texts is a list of tuples: [neg1_batch, neg2_batch, neg3_batch, ...] where each neg_i_batch is (sample1_neg_i, sample2_neg_i, ...)
         batch_size = len(anchor_text)
-        n_negatives = len(negative_texts[0])  # All samples should have same number of negatives
+        n_negatives = len(negative_texts)  # Number of negative positions
         
         print(f"  batch_size: {batch_size}, n_negatives: {n_negatives}")
         
         # Flatten the negative texts for batch encoding
         flat_negatives = []
-        for sample_negatives in negative_texts:
-            flat_negatives.extend(sample_negatives)
+        for neg_batch in negative_texts:  # neg_batch is a tuple of strings for this negative position
+            flat_negatives.extend(neg_batch)
         
         print(f"  flat_negatives length: {len(flat_negatives)}")
         print(f"  expected length: {batch_size * n_negatives}")
@@ -49,7 +49,7 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         z_negatives_flat = self.encode(flat_negatives)  # [batch_size * n_negatives, emb_dim]
         print(f"  z_negatives_flat shape: {z_negatives_flat.shape}")
         
-        z_negatives = z_negatives_flat.view(batch_size, n_negatives, -1)  # [batch_size, n_negatives, emb_dim]
+        z_negatives = z_negatives_flat.view(n_negatives, batch_size, -1).transpose(0, 1)  # [batch_size, n_negatives, emb_dim]
         print(f"  z_negatives shape: {z_negatives.shape}")
         
         return z_anchor, z_positives, z_negatives
