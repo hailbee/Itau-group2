@@ -13,7 +13,11 @@ class TextPairDataset(Dataset):
         return len(self.name1)
 
     def __getitem__(self, idx):
-        return self.name1[idx], self.name2[idx], torch.tensor(self.label[idx], dtype=torch.float32)
+        # Add debugging to see what's happening
+        print(f"DEBUG: TextPairDataset.__getitem__ called with idx={idx}")
+        label_tensor = torch.tensor(self.label[idx], dtype=torch.float32)
+        print(f"DEBUG: Created label tensor: {label_tensor}, device: {label_tensor.device}")
+        return self.name1[idx], self.name2[idx], label_tensor
 
 class TripletDataset(Dataset):
     def __init__(self, dataframe):
