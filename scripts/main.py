@@ -35,6 +35,8 @@ def main():
                       help='Number of training epochs')
     parser.add_argument('--warmup_epochs', type=int, default=5,
                       help='Number of warmup epochs')
+    parser.add_argument('--cirriculum', type=str, default=None,
+                      help='Cirriculum learning mode')
     parser.add_argument('--log_dir', type=str, default='results',
                       help='Directory to save results')
 
@@ -83,7 +85,8 @@ def main():
             mode=args.model_type,
             epochs=args.epochs,
             warmup_loader=None,  # You'll need to create appropriate dataloader
-            warmup_epochs=args.warmup_epochs
+            warmup_epochs=args.warmup_epochs,
+            cirriculum = args.cirriculum
         )
 
     elif args.mode == 'grid_search':
@@ -108,7 +111,8 @@ def main():
             loss_type=args.loss_type,
             warmup_filepath=args.warmup_filepath,
             epochs=args.epochs,
-            warmup_epochs=args.warmup_epochs
+            warmup_epochs=args.warmup_epochs,
+            cirriculum=args.cirriculum
         )
         
         print("\nGrid Search Results:")
