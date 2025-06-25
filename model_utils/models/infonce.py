@@ -17,15 +17,7 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
             negative_texts: list of tuples of negative text strings, shape [n_negatives, batch_size]
         Returns:
             tuple: (z_anchor, z_positives, z_negatives) embeddings
-        """
-        # Debug prints
-        print(f"DEBUG InfoNCE forward:")
-        print(f"  anchor_text type: {type(anchor_text)}, length: {len(anchor_text)}")
-        print(f"  positive_text type: {type(positive_text)}, length: {len(positive_text)}")
-        print(f"  negative_texts type: {type(negative_texts)}, length: {len(negative_texts)}")
-        print(f"  negative_texts[0] type: {type(negative_texts[0])}, length: {len(negative_texts[0])}")
-        print(f"  negative_texts[0][0]: {negative_texts[0][0]}")
-        
+        """      
         # Encode anchors
         z_anchor = self.encode(anchor_text)  # [batch_size, emb_dim]
         # Encode positives
@@ -36,20 +28,13 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         batch_size = len(anchor_text)
         n_negatives = len(negative_texts)  # Number of negative positions
         
-        print(f"  batch_size: {batch_size}, n_negatives: {n_negatives}")
-        
         # Flatten the negative texts for batch encoding
         flat_negatives = []
         for neg_batch in negative_texts:  # neg_batch is a tuple of strings for this negative position
             flat_negatives.extend(neg_batch)
         
-        print(f"  flat_negatives length: {len(flat_negatives)}")
-        print(f"  expected length: {batch_size * n_negatives}")
-        
         z_negatives_flat = self.encode(flat_negatives)  # [batch_size * n_negatives, emb_dim]
-        print(f"  z_negatives_flat shape: {z_negatives_flat.shape}")
         
         z_negatives = z_negatives_flat.view(n_negatives, batch_size, -1).transpose(0, 1)  # [batch_size, n_negatives, emb_dim]
-        print(f"  z_negatives shape: {z_negatives.shape}")
         
         return z_anchor, z_positives, z_negatives
