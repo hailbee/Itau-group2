@@ -40,6 +40,9 @@ class Trainer:
                 if isinstance(labels, torch.Tensor):
                     labels = labels.to(self.device)
                     print(f"DEBUG: Moved labels to device: {labels.device}")
+                
+                # Create new batch with moved labels
+                batch = (text1, text2, labels)
             else:
                 print(f"DEBUG: Non-pair mode, batch contents: {[type(item) for item in batch]}")
             
