@@ -24,8 +24,10 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
         z_positive = self.encode(positive_text)  # [batch_size, emb_dim]
         # Reshape positive to 3D tensor: [batch_size, 1, emb_dim]
         z_positives = z_positive.unsqueeze(1)  # [batch_size, 1, emb_dim]
-        # Encode negatives
-        z_negatives = torch.stack([
-            self.encode(neg_list) for neg_list in negative_texts
-        ], dim=0)  # [batch_size, n_negatives, emb_dim]
+        # Encode negatives robustly
+        batch_size = len(negative_texts)
+        n_negatives = len(negative_texts[0])
+        flat_negatives = [neg for neg_list in negative_texts for neg in neg_list]  # [batch_size * n_negatives]
+        z_neg_flat = self.encode(flat_negatives)  # [batch_size * n_negatives, emb_dim]
+        z_negatives = z_neg_flat.view(batch_size, n_negatives, -1)  # [batch_size, n_negatives, emb_dim]
         return z_anchor, z_positives, z_negatives
