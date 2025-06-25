@@ -3,15 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import CLIPModel, CLIPTokenizer
 
-# Load CLIP model and tokenizer
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-
 class BaseSiameseCLIP(nn.Module):
     def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True):
         super().__init__()
-        self.clip = clip_model
-        self.tokenizer = clip_tokenizer
+        # Load CLIP model and tokenizer
+        self.clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
 
         if freeze_clip:
             for param in self.clip.parameters():
@@ -22,6 +19,12 @@ class BaseSiameseCLIP(nn.Module):
             nn.ReLU(),
             nn.Linear(projection_dim, projection_dim)
         )
+
+    def to(self, device):
+        """Override to method to ensure CLIP model is also moved to device"""
+        super().to(device)
+        self.clip = self.clip.to(device)
+        return self
 
     def encode(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.clip.device)
