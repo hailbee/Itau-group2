@@ -26,34 +26,9 @@ class Trainer:
         epoch_loss = 0.0
         
         for i, batch in enumerate(dataloader):
-            # Add debugging for device placement
-            print(f"DEBUG: Batch {i} - mode: {mode}")
-            print(f"DEBUG: Model device: {next(self.model.parameters()).device}")
-            print(f"DEBUG: Batch type: {type(batch)}")
-            print(f"DEBUG: Batch length: {len(batch)}")
-            
-            if mode == "pair":
-                text1, text2, labels = batch
-                print(f"DEBUG: text1 type: {type(text1)}, text2 type: {type(text2)}")
-                print(f"DEBUG: labels type: {type(labels)}, device: {labels.device if hasattr(labels, 'device') else 'N/A'}")
-                # Move labels to device if it's a tensor
-                if isinstance(labels, torch.Tensor):
-                    labels = labels.to(self.device)
-                    print(f"DEBUG: Moved labels to device: {labels.device}")
-                
-                # Create new batch with moved labels
-                batch = (text1, text2, labels)
-            else:
-                print(f"DEBUG: Non-pair mode, batch contents: {[type(item) for item in batch]}")
-            
             # Unified logic: model and criterion handle all modes
             outputs = self.model(*batch)
-            print(f"DEBUG: Model outputs type: {type(outputs)}")
-            if isinstance(outputs, tuple):
-                print(f"DEBUG: Outputs devices: {[out.device if hasattr(out, 'device') else 'N/A' for out in outputs]}")
-            
             loss = self.criterion(*outputs)
-            print(f"DEBUG: Loss computed: {loss}, device: {loss.device}")
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -62,10 +37,6 @@ class Trainer:
 
             if i % 100 == 0:
                 print(f"Step {i} complete out of {len(dataloader)}")
-            
-            # Only debug first few batches
-            if i >= 2:
-                break
 
         return epoch_loss / len(dataloader)
 
