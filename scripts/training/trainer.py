@@ -49,9 +49,9 @@ class Trainer:
         results_df, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
         return metrics
 
-    # pass in cirriculum learning parameter 
+    # pass in curriculum learning parameter 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, cirriculum = None):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None):
         """
         Main training loop with optional warmup.
         
@@ -87,8 +87,8 @@ class Trainer:
 
             for epoch in range(epochs):
                 
-                # self paced cirriculum learning
-                if cirriculum == "self":
+                # self paced curriculum learning
+                if curriculum == "self":
                     hard_ratio = min(0.1 * epoch, 1.0)
                     easy_ratio = 1.0 - hard_ratio
 
@@ -106,8 +106,8 @@ class Trainer:
 
                     current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
                 
-                # bandit cirriculum learning
-                elif cirriculum == "bandit":
+                # bandit curriculum learning
+                elif curriculum == "bandit":
 
                     # exploration rate
                     epsilon = 0.1 
@@ -150,7 +150,7 @@ class Trainer:
                     mix_desc = f"bandit (chose {chosen_dataset_name})"
 
                 else:
-                    # non cirriculum mode
+                    # non curriculum mode
                     current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
 
                 # Train 
@@ -163,7 +163,7 @@ class Trainer:
                 # Evaluate
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
 
-                if cirriculum == "bandit":
+                if curriculum == "bandit":
                     delta_acc = metrics['accuracy'] - prev_accuracy
                     prev_accuracy = metrics['accuracy']
                     rewards[chosen_dataset_name].append(delta_acc)

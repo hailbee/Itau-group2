@@ -44,8 +44,8 @@ def main():
                       help='Number of training epochs')
     parser.add_argument('--warmup_epochs', type=int, default=5,
                       help='Number of warmup epochs')
-    parser.add_argument('--cirriculum', type=str, default=None,
-                      help='Cirriculum learning mode')
+    parser.add_argument('--curriculum', type=str, default=None,
+                      help='Curriculum learning mode')
     parser.add_argument('--log_dir', type=str, default='results',
                       help='Directory to save results')
     parser.add_argument('--temperature', type=float, default=0.07,
@@ -137,7 +137,7 @@ def main():
             epochs=args.epochs,
             warmup_loader=None,  # You'll need to create appropriate dataloader
             warmup_epochs=args.warmup_epochs,
-            cirriculum = args.cirriculum
+            curriculum = args.curriculum
         )
 
     elif args.mode == 'grid_search':
@@ -172,7 +172,7 @@ def main():
             epochs=args.epochs,
             warmup_epochs=args.warmup_epochs,
             temperature=args.temperature,
-            cirriculum=args.cirriculum
+            curriculum=args.curriculum
         )
         
         print("\nGrid Search Results:")

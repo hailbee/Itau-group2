@@ -50,7 +50,7 @@ class GridSearcher:
     def search(self, reference_filepath, test_reference_filepath, test_filepath,
               lrs, batch_sizes, margins, internal_layer_sizes,
               mode="pair", loss_type="cosine", warmup_filepath=None,
-              epochs=5, warmup_epochs=5, cirriculum = None, temperature=0.07):
+              epochs=5, warmup_epochs=5, curriculum = None, temperature=0.07):
         """
         Perform grid search over hyperparameters.
         
@@ -131,7 +131,7 @@ class GridSearcher:
                             epochs=epochs,
                             warmup_loader=warmup_loader,
                             warmup_epochs=warmup_epochs,
-                            cirriculum=cirriculum
+                            curriculum=curriculum
                         )
 
                         # Evaluate model
