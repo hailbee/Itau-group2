@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import pandas as pd
-from sklearn.metrics import roc_curve, precision_score, recall_score, accuracy_score
+from sklearn.metrics import roc_curve, precision_score, recall_score, accuracy_score, roc_auc_score
 from utils.evals import find_best_threshold_youden
 from utils.embeddings import EmbeddingExtractor, batched_embedding
 
@@ -83,12 +83,14 @@ class Evaluator:
         y_pred = (y_scores > youden_thresh).astype(int)
         
         # Compute metrics
+        roc_auc = roc_auc_score(y_true, y_scores)
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),
             'precision': precision_score(y_true, y_pred, zero_division=0),
             'recall': recall_score(y_true, y_pred, zero_division=0),
             'threshold': youden_thresh,
-            'roc_curve': (fpr, tpr, thresholds)
+            'roc_curve': (fpr, tpr, thresholds),
+            'roc_auc': roc_auc
         }
         
         return metrics

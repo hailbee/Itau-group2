@@ -72,6 +72,7 @@ class GridSearcher:
         results = []
         best_loss = float("inf")
         best_acc = 0
+        best_auc = 0.0
         best_config = {}
 
         # Load data
@@ -123,7 +124,7 @@ class GridSearcher:
                               f"size={internal_layer_size}, loss={loss_type} ---")
 
                         # Train model
-                        model_loss = trainer.train(
+                        best_metrics = trainer.train(
                             dataloader=dataloader,
                             test_reference_filepath=test_reference_filepath,
                             test_filepath=test_filepath,
@@ -133,15 +134,9 @@ class GridSearcher:
                             warmup_epochs=warmup_epochs
                         )
 
-                        # Evaluate model
-                        results_df, metrics = evaluator.evaluate(
-                            test_reference_filepath,
-                            test_filepath
-                        )
-
                         # Track best results
-                        if model_loss < best_loss:
-                            best_loss = model_loss
+                        if best_metrics.get('loss', float('inf')) < best_loss:
+                            best_loss = best_metrics.get('loss', float('inf'))
                             best_model_state = model.state_dict()
                             best_model_path = (
                                 f"{self.log_dir}/model_lr{lr}_bs{batch_size}_"
@@ -150,18 +145,27 @@ class GridSearcher:
                             )
                             torch.save(best_model_state, best_model_path)
 
-                        if metrics['accuracy'] > best_acc:
-                            best_acc = metrics['accuracy']
+                        if best_metrics['accuracy'] > best_acc:
+                            best_acc = best_metrics['accuracy']
                             best_config = {
                                 "lr": lr,
                                 "batch_size": batch_size,
                                 "temperature" if mode in ["supcon", "infonce"] else "margin": temperature if mode in ["supcon", "infonce"] else margin,
                                 "internal_layer_size": internal_layer_size,
                                 "best_loss": best_loss,
-                                "best_accuracy": metrics['accuracy'],
-                                "threshold": metrics['threshold'],
+                                "best_accuracy": best_metrics['accuracy'],
+                                "threshold": best_metrics.get('threshold', 0.5),
                                 "loss_type": loss_type
                             }
+
+                        # Track best AUC
+                        current_auc = best_metrics['roc_auc']
+                        if current_auc > best_auc:
+                            best_auc = current_auc
+                            print(f"New best AUC: {best_auc:.4f}")
+                        
+                        print(f"Config: lr={lr}, bs={batch_size}, {'temp' if mode in ['supcon', 'infonce'] else 'margin'}={temperature if mode in ['supcon', 'infonce'] else margin}, size={internal_layer_size}")
+                        print(f"Accuracy: {best_metrics['accuracy']:.4f} (Best: {best_acc:.4f}), AUC: {current_auc:.4f} (Best: {best_auc:.4f})")
 
                         # Log results
                         results.append({
@@ -172,10 +176,10 @@ class GridSearcher:
                             "internal_layer_size": internal_layer_size,
                             "epochs": epochs,
                             "best_train_loss": best_loss,
-                            "test_auc": metrics['roc_curve'][1].mean(),  # Mean TPR
-                            "test_youden_threshold": metrics['threshold'],
-                            "test_best_accuracy": metrics['accuracy'],
-                            "test_accuracy_threshold": metrics['threshold'],
+                            "test_auc": best_metrics['roc_auc'],
+                            "test_youden_threshold": best_metrics.get('threshold', 0.5),
+                            "test_best_accuracy": best_metrics['accuracy'],
+                            "test_accuracy_threshold": best_metrics.get('threshold', 0.5),
                             "loss_type": loss_type
                         })
 
@@ -186,6 +190,13 @@ class GridSearcher:
 
         print("\nOverall Best config based on max test accuracy:")
         print(best_config)
+
+        # Print best AUC
+        if not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
 
         return best_config, results_df
 
@@ -207,4 +218,6 @@ class GridSearcher:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4) 

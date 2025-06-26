@@ -44,7 +44,7 @@ def main():
                       help='Number of training epochs')
     parser.add_argument('--warmup_epochs', type=int, default=5,
                       help='Number of warmup epochs')
-    parser.add_argument('--log_dir', type=str, default='results',
+    parser.add_argument('--log_dir', type=str, default='/content/drive/MyDrive/Project_2_Business_Names/Summer 2025/code',
                       help='Directory to save results')
     parser.add_argument('--temperature', type=float, default=0.07,
                       help='Temperature parameter for SupCon/InfoNCE loss (default: 0.07)')

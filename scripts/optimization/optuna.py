@@ -23,6 +23,8 @@ class OptunaOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -76,6 +78,8 @@ class OptunaOptimizer:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def objective(self, trial, reference_filepath, test_reference_filepath, test_filepath,
@@ -162,7 +166,7 @@ class OptunaOptimizer:
             evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -170,12 +174,6 @@ class OptunaOptimizer:
                 epochs=epochs,
                 warmup_loader=warmup_loader,
                 warmup_epochs=warmup_epochs
-            )
-            
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
             )
             
             # Log results
@@ -188,19 +186,35 @@ class OptunaOptimizer:
                 "optimizer": optimizer_name,
                 "weight_decay": weight_decay,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_curve'][1].mean(),
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
                 **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
-            # Report intermediate value for pruning
-            trial.report(metrics['accuracy'], epoch=epochs)
+            # Track best AUC
+            current_auc = best_metrics['roc_auc']
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {trial.number}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {trial.number}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
-            return metrics['accuracy']
+            # Track best accuracy
+            current_accuracy = best_metrics['accuracy']
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"Trial {trial.number}: New best accuracy = {self.best_accuracy:.4f}")
+            else:
+                print(f"Trial {trial.number}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
+            
+            # Report intermediate value for pruning
+            trial.report(best_metrics['accuracy'], epochs)
+            
+            return best_metrics['accuracy']
             
         except Exception as e:
             print(f"Error in trial {trial.number}: {e}")
@@ -286,6 +300,13 @@ class OptunaOptimizer:
         results_df = pd.DataFrame(self.results)
         results_df.to_csv(f"{self.log_dir}/optuna_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                          index=False)
+        
+        # Print best AUC
+        if not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
         
         # Save study
         study_path = f"{self.log_dir}/optuna_study_{study_name}.pkl"
