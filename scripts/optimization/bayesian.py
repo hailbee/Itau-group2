@@ -78,8 +78,8 @@ class BayesianOptimizer:
 
         from torch.utils.data import DataLoader
         # Use num_workers=0 for pair mode to avoid device mismatch issues
-        num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        # num_workers = 0 if mode == "pair" else 4
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def sample_hyperparameters(self, mode, n_samples):
         """

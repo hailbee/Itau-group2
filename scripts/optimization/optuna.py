@@ -79,8 +79,8 @@ class OptunaOptimizer:
 
         from torch.utils.data import DataLoader
         # Use num_workers=0 for pair mode to avoid device mismatch issues
-        num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        # num_workers = 0 if mode == "pair" else 4
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def objective(self, trial, reference_filepath, test_reference_filepath, test_filepath,
                  mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5):
