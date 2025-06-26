@@ -13,19 +13,22 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
         Forward pass for SupCon learning (batched).
         Args:
             anchor_text: list of anchor text strings, len=batch_size
-            positive_texts: list of list of positive text strings, shape [batch_size, n_positives]
-            negative_texts: list of list of negative text strings, shape [batch_size, n_negatives]
+            positive_texts: tuple or list of lists of positive text strings, shape [batch_size, n_positives] or [n_positives, batch_size]
+            negative_texts: tuple or list of lists of negative text strings, shape [batch_size, n_negatives] or [n_negatives, batch_size]
         Returns:
             tuple: (z_anchor, z_positives, z_negatives) embeddings
         """
         # Encode anchors
         z_anchor = self.encode(anchor_text)  # [batch_size, emb_dim]
-        # Encode positives
+        
+        # Handle positives - always stack then transpose to [batch_size, n_positives, emb_dim]
         z_positives = torch.stack([
             self.encode(pos_list) for pos_list in positive_texts
-        ], dim=0)  # [batch_size, n_positives, emb_dim]
-        # Encode negatives
+        ], dim=0).transpose(0, 1)  # [batch_size, n_positives, emb_dim]
+        
+        # Handle negatives - always stack then transpose to [batch_size, n_negatives, emb_dim]
         z_negatives = torch.stack([
             self.encode(neg_list) for neg_list in negative_texts
-        ], dim=0)  # [batch_size, n_negatives, emb_dim]
+        ], dim=0).transpose(0, 1)  # [batch_size, n_negatives, emb_dim]
+        
         return z_anchor, z_positives, z_negatives

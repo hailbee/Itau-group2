@@ -20,6 +20,8 @@ class RandomOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -73,6 +75,8 @@ class RandomOptimizer:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def sample_hyperparameters(self, mode, n_trials):
@@ -175,10 +179,9 @@ class RandomOptimizer:
                 device=self.device,
                 log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             )
-            evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -188,12 +191,6 @@ class RandomOptimizer:
                 warmup_epochs=warmup_epochs
             )
             
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
-            )
-            
             # Return results
             return {
                 "timestamp": datetime.now(),
@@ -201,12 +198,12 @@ class RandomOptimizer:
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_curve'][1].mean(),
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
-                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
+                **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             
         except Exception as e:
@@ -249,7 +246,6 @@ class RandomOptimizer:
         # Sample hyperparameters
         trials = self.sample_hyperparameters(mode, n_trials)
         
-        best_accuracy = 0.0
         best_config = None
         
         # Evaluate each trial
@@ -265,12 +261,28 @@ class RandomOptimizer:
             self.results.append(result)
             
             # Track best result
-            if result['test_accuracy'] > best_accuracy:
-                best_accuracy = result['test_accuracy']
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if result['test_accuracy'] > self.best_accuracy:
+                best_config = {**params, "best_accuracy": result['test_accuracy']}
+            
+            # Track best AUC
+            current_auc = result['test_auc']
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {i+1}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {i+1}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
+            
+            # Track best accuracy
+            current_accuracy = result['test_accuracy']
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"Trial {i+1}: New best accuracy = {self.best_accuracy:.4f}")
+            else:
+                print(f"Trial {i+1}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
             
             print(f"Accuracy: {result['test_accuracy']:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Save results
         results_df = pd.DataFrame(self.results)
@@ -278,7 +290,6 @@ class RandomOptimizer:
                          index=False)
         
         print(f"\nRandom search completed!")
-        print(f"Best accuracy: {best_accuracy:.4f}")
         print(f"Best configuration: {best_config}")
         
         return best_config, results_df 

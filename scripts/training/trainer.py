@@ -63,6 +63,9 @@ class Trainer:
             epochs: Number of training epochs
             warmup_loader: Optional warmup dataloader
             warmup_epochs: Number of warmup epochs
+            
+        Returns:
+            dict: Best metrics achieved during training
         """
         # bandit learning setup 
         datasets = {
@@ -74,16 +77,23 @@ class Trainer:
         rewards = {k: [] for k in datasets}
         # keeping track of accuracy
         prev_accuracy = 0.0
-
+        best_metrics = {
+            'accuracy': 0.0,
+            'precision': 0.0,
+            'recall': 0.0,
+            'roc_auc': 0.0
+        }
+        best_epochs = {
+            'accuracy': -1,
+            'precision': -1,
+            'recall': -1,
+            'roc_auc': -1
+        }
         best_epoch_loss = float('inf')
-
-        # bandit learning metrics
-        best_metrics = {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0}
-        best_epochs = {'accuracy': -1, 'precision': -1, 'recall': -1}
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall"])
+            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC"])
 
             for epoch in range(epochs):
                 
@@ -116,12 +126,14 @@ class Trainer:
                     best_metrics = {
                         'accuracy': 0.0,
                         'precision': 0.0,
-                        'recall': 0.0
+                        'recall': 0.0,
+                        'roc_auc': 0.0
                     }
                     best_epochs = {
                         'accuracy': -1,
                         'precision': -1,
-                        'recall': -1
+                        'recall': -1,
+                        'roc_auc': -1
                     }
 
                      # Bandit curriculum learning
@@ -148,12 +160,13 @@ class Trainer:
 
                     current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
                     mix_desc = f"bandit (chose {chosen_dataset_name})"
+                    print(mix_desc)
 
                 else:
                     # non curriculum mode
                     current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
 
-                # Train 
+                # Train epoch
                 avg_loss = self.train_epoch(current_loader, mode)
                 print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
 
@@ -174,23 +187,30 @@ class Trainer:
                     avg_loss, 
                     metrics['accuracy'], 
                     metrics['precision'], 
-                    metrics['recall']
+                    metrics['recall'],
+                    metrics.get('roc_auc', None)
                 ])
 
                 print(f"Epoch {epoch+1} - Test Accuracy: {metrics['accuracy']:.4f} | "
                       f"Precision: {metrics['precision']:.4f} | "
-                      f"Recall: {metrics['recall']:.4f}")
+                      f"Recall: {metrics['recall']:.4f} | "
+                      f"AUC: {metrics.get('roc_auc', float('nan')):.4f}")
 
                 # Track best metrics
-                for metric in ['accuracy', 'precision', 'recall']:
-                    if metrics[metric] > best_metrics[metric]:
+                for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
+                    if metric in metrics and metrics[metric] > best_metrics[metric]:
                         best_metrics[metric] = metrics[metric]
                         best_epochs[metric] = epoch + 1
 
         # Print summary
         print("\n=== Best Epochs Summary ===")
-        for metric in ['accuracy', 'precision', 'recall']:
-            print(f"Best {metric.capitalize()}: {best_metrics[metric]:.4f} "
-                  f"at epoch {best_epochs[metric]}")
+        for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
+            if best_epochs[metric] != -1:
+                print(f"Best {metric.capitalize()}: {best_metrics[metric]:.4f} "
+                      f"at epoch {best_epochs[metric]}")
+        print(f"Best Loss: {best_epoch_loss:.4f}")
 
-        return best_epoch_loss 
+        # Add loss to best_metrics
+        best_metrics['loss'] = best_epoch_loss
+
+        return best_metrics 

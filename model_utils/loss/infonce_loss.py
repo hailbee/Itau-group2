@@ -49,7 +49,7 @@ class InfoNCELoss(nn.Module):
         all_similarities = torch.cat([pos_similarities, neg_similarities], dim=1)
         
         # Create labels: 0 for positives (first n_positives columns), 1 for negatives
-        labels = torch.zeros(batch_size, device=device)
+        labels = torch.zeros(batch_size, device=device, dtype=torch.long)
         
         # Compute cross entropy loss
         loss = F.cross_entropy(all_similarities, labels)

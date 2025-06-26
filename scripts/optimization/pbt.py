@@ -21,6 +21,8 @@ class PopulationBasedTrainer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all generations
+        self.best_accuracy = 0.0  # Track best accuracy across all generations
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -74,6 +76,8 @@ class PopulationBasedTrainer:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def sample_initial_hyperparameters(self, mode, population_size):
@@ -277,7 +281,7 @@ class PopulationBasedTrainer:
                 print(f"Training model {i+1}/{len(models)} with params: {population[i]}")
                 
                 # Train model
-                model_loss = trainer.train(
+                best_metrics = trainer.train(
                     dataloader=dataloader,
                     test_reference_filepath=test_reference_filepath,
                     test_filepath=test_filepath,
@@ -287,26 +291,20 @@ class PopulationBasedTrainer:
                     warmup_epochs=warmup_epochs if generation == 0 else 0
                 )
                 
-                # Evaluate model
-                results_df, metrics = evaluators[i].evaluate(
-                    test_reference_filepath,
-                    test_filepath
-                )
-                
                 result = {
                     "generation": generation + 1,
                     "model_id": i,
                     "timestamp": datetime.now(),
-                    "accuracy": metrics['accuracy'],
-                    "train_loss": model_loss,
-                    "test_auc": metrics['roc_curve'][1].mean(),
-                    "threshold": metrics['threshold'],
+                    "accuracy": best_metrics['accuracy'],
+                    "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                    "test_auc": best_metrics['roc_auc'],
+                    "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                     **population[i]
                 }
                 generation_results.append(result)
                 self.results.append(result)
                 
-                print(f"Model {i+1} accuracy: {metrics['accuracy']:.4f}")
+                print(f"Model {i+1} accuracy: {best_metrics['accuracy']:.4f}")
             
             # Evolution step
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:
@@ -338,11 +336,26 @@ class PopulationBasedTrainer:
                         device=self.device,
                         log_csv_path=f"{self.log_dir}/pbt_training_log_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                     )
+            
+            # Update best AUC
+            current_auc = max(result['test_auc'] for result in generation_results)
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"New best AUC: {self.best_auc:.4f}")
+            
+            # Update best accuracy
+            current_accuracy = max(result['accuracy'] for result in generation_results)
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"New best accuracy: {self.best_accuracy:.4f}")
+            
+            print(f"Generation {generation + 1}: Best AUC = {self.best_auc:.4f}, Best Accuracy = {self.best_accuracy:.4f}")
         
         # Find best model
         best_result = max(self.results, key=lambda x: x['accuracy'])
         best_config = {k: v for k, v in best_result.items() if k not in ['generation', 'model_id', 'timestamp', 'accuracy', 'train_loss', 'test_auc', 'threshold']}
         best_config['best_accuracy'] = best_result['accuracy']
+        best_config['best_auc'] = self.best_auc
         
         print(f"\nPBT completed!")
         print(f"Best accuracy: {best_result['accuracy']:.4f}")

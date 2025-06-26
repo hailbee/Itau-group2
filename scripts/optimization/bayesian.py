@@ -22,6 +22,8 @@ class BayesianOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create log directory if it doesn't exist
         os.makedirs(self.log_dir, exist_ok=True)
@@ -75,6 +77,8 @@ class BayesianOptimizer:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def sample_hyperparameters(self, mode, n_samples):
@@ -179,7 +183,7 @@ class BayesianOptimizer:
             evaluator = Evaluator(model, batch_size=batch_size)
             
             # Train model
-            model_loss = trainer.train(
+            best_metrics = trainer.train(
                 dataloader=dataloader,
                 test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
@@ -189,12 +193,6 @@ class BayesianOptimizer:
                 warmup_epochs=warmup_epochs
             )
             
-            # Evaluate model
-            results_df, metrics = evaluator.evaluate(
-                test_reference_filepath,
-                test_filepath
-            )
-            
             # Log results
             result = {
                 "timestamp": datetime.now(),
@@ -202,21 +200,32 @@ class BayesianOptimizer:
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
                 "epochs": epochs,
-                "train_loss": model_loss,
-                "test_accuracy": metrics['accuracy'],
-                "test_auc": metrics['roc_curve'][1].mean(),
-                "threshold": metrics['threshold'],
+                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                "test_accuracy": best_metrics['accuracy'],
+                "test_auc": best_metrics['roc_auc'],
+                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                 "loss_type": loss_type,
-                **{k: float(v) for k, v in params.items() if k in ['temperature', 'margin'] and v is not None}
+                **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
             }
             self.results.append(result)
             
-            print(f"Trial - lr={lr:.2e}, bs={batch_size}, "
-                  f"{'temp' if mode in ['supcon', 'infonce'] else 'margin'}={params.get('temperature', params.get('margin', 0)):.3f}, "
-                  f"size={internal_layer_size}, acc={metrics['accuracy']:.4f}")
+            # Track best AUC
+            current_auc = best_metrics['roc_auc']
+            if current_auc > self.best_auc:
+                self.best_auc = current_auc
+                print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
+            else:
+                print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
             
-            # Return negative accuracy (we want to maximize accuracy)
-            return -metrics['accuracy']
+            # Track best accuracy
+            current_accuracy = best_metrics['accuracy']
+            if current_accuracy > self.best_accuracy:
+                self.best_accuracy = current_accuracy
+                print(f"Trial {len(self.results)}: New best accuracy = {self.best_accuracy:.4f}")
+            else:
+                print(f"Trial {len(self.results)}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
+            
+            return -best_metrics['accuracy']
             
         except Exception as e:
             print(f"Error in trial: {e}")
@@ -246,7 +255,6 @@ class BayesianOptimizer:
         # Sample initial hyperparameters
         initial_samples = self.sample_hyperparameters(mode, n_random_starts)
         
-        best_accuracy = 0.0
         best_config = None
         
         # Evaluate initial random samples
@@ -259,12 +267,12 @@ class BayesianOptimizer:
                 test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if accuracy > self.best_accuracy:
+                best_config = {**params, "best_accuracy": accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         # Continue with additional random sampling (simplified Bayesian optimization)
         remaining_trials = n_calls - n_random_starts
@@ -279,15 +287,15 @@ class BayesianOptimizer:
                 test_filepath, mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_config = {**params, "best_accuracy": best_accuracy}
+            if accuracy > self.best_accuracy:
+                best_config = {**params, "best_accuracy": accuracy}
             
             print(f"Accuracy: {accuracy:.4f}")
-            print(f"Best so far: {best_accuracy:.4f}")
+            print(f"Best accuracy so far: {self.best_accuracy:.4f}")
+            print(f"Best AUC so far: {self.best_auc:.4f}")
         
         print(f"\nOptimization completed!")
-        print(f"Best accuracy: {best_accuracy:.4f}")
+        print(f"Best accuracy: {self.best_accuracy:.4f}")
         print(f"Best parameters: {best_config}")
         
         # Save results

@@ -22,6 +22,8 @@ class UnifiedHyperparameterOptimizer:
         self.device = device
         self.log_dir = log_dir
         self.results = []
+        self.best_auc = 0.0  # Track best AUC across all trials
+        self.best_accuracy = 0.0  # Track best accuracy across all trials
         
         # Create main log directory
         os.makedirs(self.log_dir, exist_ok=True)
@@ -81,6 +83,8 @@ class UnifiedHyperparameterOptimizer:
             raise ValueError(f"Unknown mode: {mode}")
 
         from torch.utils.data import DataLoader
+        # Use num_workers=0 for pair mode to avoid device mismatch issues
+        # num_workers = 0 if mode == "pair" else 4
         return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
     def sample_initial_hyperparameters(self, mode, population_size):
@@ -284,7 +288,7 @@ class UnifiedHyperparameterOptimizer:
                 print(f"Training model {i+1}/{len(models)} with params: {population[i]}")
                 
                 # Train model
-                model_loss = trainer.train(
+                best_metrics = trainer.train(
                     dataloader=dataloader,
                     test_reference_filepath=test_reference_filepath,
                     test_filepath=test_filepath,
@@ -294,26 +298,52 @@ class UnifiedHyperparameterOptimizer:
                     warmup_epochs=warmup_epochs if generation == 0 else 0
                 )
                 
-                # Evaluate model
-                results_df, metrics = evaluators[i].evaluate(
-                    test_reference_filepath,
-                    test_filepath
-                )
+                # Log results
+                result = {
+                    "trial_number": len(self.results) + 1,
+                    "timestamp": datetime.now(),
+                    "lr": population[i]['lr'],
+                    "batch_size": population[i]['batch_size'],
+                    "internal_layer_size": population[i]['internal_layer_size'],
+                    "optimizer": population[i]['optimizer'],
+                    "weight_decay": population[i]['weight_decay'],
+                    "epochs": epochs_per_generation,
+                    "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                    "test_accuracy": best_metrics['accuracy'],
+                    "test_auc": best_metrics['roc_auc'],
+                    "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
+                    "loss_type": loss_type,
+                    **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
+                }
+                self.results.append(result)
+                
+                # Track best AUC
+                current_auc = best_metrics['roc_auc']
+                if current_auc > self.best_auc:
+                    self.best_auc = current_auc
+                    print(f"Trial {len(self.results)}: New best AUC = {self.best_auc:.4f}")
+                else:
+                    print(f"Trial {len(self.results)}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
+                
+                # Track best accuracy
+                current_accuracy = best_metrics['accuracy']
+                if current_accuracy > self.best_accuracy:
+                    self.best_accuracy = current_accuracy
+                    print(f"Trial {len(self.results)}: New best accuracy = {self.best_accuracy:.4f}")
+                else:
+                    print(f"Trial {len(self.results)}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
                 
                 result = {
                     "generation": generation + 1,
                     "model_id": i,
                     "timestamp": datetime.now(),
-                    "accuracy": metrics['accuracy'],
-                    "train_loss": model_loss,
-                    "test_auc": metrics['roc_curve'][1].mean(),
-                    "threshold": metrics['threshold'],
+                    "accuracy": best_metrics['accuracy'],
+                    "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
+                    "test_auc": best_metrics['roc_auc'],
+                    "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
                     **population[i]
                 }
                 generation_results.append(result)
-                self.results.append(result)
-                
-                print(f"Model {i+1} accuracy: {metrics['accuracy']:.4f}")
             
             # Evolution step
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:
@@ -354,6 +384,11 @@ class UnifiedHyperparameterOptimizer:
         print(f"\nPBT completed!")
         print(f"Best accuracy: {best_result['accuracy']:.4f}")
         print(f"Best configuration: {best_config}")
+        
+        # After optimization, print best AUC if available
+        if isinstance(best_metrics, dict) and 'roc_auc' in best_metrics:
+            best_auc = best_metrics['roc_auc']
+            print(f"Best AUC: {best_auc:.4f}")
         
         return best_config, pd.DataFrame(self.results)
     
@@ -451,6 +486,13 @@ class UnifiedHyperparameterOptimizer:
             n_random_starts=n_random_starts
         )
         
+        # After optimization, print best AUC if available
+        if isinstance(results_df, pd.DataFrame) and not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
+        
         return best_config, results_df, {"method": "bayesian"}
     
     def _run_random_optimization(self, reference_filepath, test_reference_filepath, test_filepath,
@@ -471,6 +513,13 @@ class UnifiedHyperparameterOptimizer:
             warmup_epochs=warmup_epochs,
             n_trials=n_trials
         )
+        
+        # After optimization, print best AUC if available
+        if isinstance(results_df, pd.DataFrame) and not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
         
         return best_config, results_df, {"method": "random"}
     
@@ -506,6 +555,13 @@ class UnifiedHyperparameterOptimizer:
             except Exception as e:
                 print(f"Warning: Could not create visualizations: {e}")
         
+        # After optimization, print best AUC if available
+        if isinstance(results_df, pd.DataFrame) and not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
+        
         return best_config, results_df, {"method": "optuna", "study": study}
     
     def _run_pbt_optimization(self, reference_filepath, test_reference_filepath, test_filepath,
@@ -530,6 +586,13 @@ class UnifiedHyperparameterOptimizer:
             population_size=population_size,
             evolution_frequency=evolution_frequency
         )
+        
+        # After optimization, print best AUC if available
+        if isinstance(results_df, pd.DataFrame) and not results_df.empty and 'test_auc' in results_df.columns:
+            best_auc = results_df['test_auc'].max()
+            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
         
         return best_config, results_df, {"method": "pbt"}
     
