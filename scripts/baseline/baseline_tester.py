@@ -99,7 +99,7 @@ class FLAVAModelWrapper(BaseVisionLanguageModel):
         return F.normalize(features, dim=1)
 
 class ALIGNModelWrapper(BaseVisionLanguageModel):
-    """Wrapper for ALIGN/SigLIP models."""
+    """Wrapper for SigLIP text-only models."""
     
     def _load_model(self):
         self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
@@ -108,17 +108,7 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.no_grad():
-            # Try text-only first
-            try:
-                outputs = self.model(**inputs)
-            except Exception as e:
-                if "pixel_values" in str(e):
-                    # If model requires images, we'll use a dummy image
-                    batch_size = inputs['input_ids'].shape[0]
-                    dummy_images = torch.zeros(batch_size, 3, 224, 224).to(self.device)
-                    outputs = self.model(**inputs, pixel_values=dummy_images)
-                else:
-                    raise e
+            outputs = self.model(**inputs)
             
             # Extract features from different output structures
             if hasattr(outputs, 'text_embeds'):
@@ -140,7 +130,7 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
                             features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
                             break
                 else:
-                    raise ValueError(f"Could not extract features from ALIGN/SigLIP model output: {type(outputs)}")
+                    raise ValueError(f"Could not extract features from SigLIP model output: {type(outputs)}")
         return F.normalize(features, dim=1)
 
 class OpenCLIPModelWrapper(BaseVisionLanguageModel):
@@ -180,7 +170,7 @@ class BaselineTester:
     Generalized interface for testing multiple vision-language model baselines.
     """
     
-    # Model configurations with fallbacks
+    # Model configurations
     MODEL_CONFIGS = {
         'clip': {
             'class': CLIPModelWrapper,
@@ -196,7 +186,7 @@ class BaselineTester:
         },
         'align': {
             'class': ALIGNModelWrapper,
-            'name': 'google/siglip-base-patch16-224'  # SigLIP model (similar to ALIGN)
+            'name': 'google/siglip-so400m-patch14-384'  # SigLIP text-only model
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
@@ -204,25 +194,7 @@ class BaselineTester:
         }
     }
     
-    # Alternative model configurations for better compatibility
-    ALTERNATIVE_MODELS = {
-        'coca': [
-            'microsoft/git-base-coco',
-            'microsoft/git-base-textcaps',
-            'microsoft/git-large-coco'
-        ],
-        'flava': [
-            'facebook/flava-base',
-            'facebook/flava-large',
-            'facebook/flava-full'
-        ],
-        'align': [
-            'google/siglip-base-patch16-224',
-            'google/siglip-large-patch16-224',
-            'kakaobrain/align-base',
-            'google/align-base'
-        ]
-    }
+
     
     def __init__(self, model_type='clip', batch_size=32, device=None):
         """
@@ -241,9 +213,9 @@ class BaselineTester:
             raise ValueError(f"Unsupported model type: {model_type}. "
                            f"Supported types: {list(self.MODEL_CONFIGS.keys())}")
         
-        # Load model wrapper with fallback support
+        # Load model wrapper
         config = self.MODEL_CONFIGS[model_type]
-        self.model_wrapper = self._load_model_with_fallback(config, model_type)
+        self.model_wrapper = config['class'](config['name'], self.device)
         
         # Create embedding extractor and evaluator
         self.extractor = GeneralizedEmbeddingExtractor(self.model_wrapper)
@@ -330,24 +302,3 @@ class BaselineTester:
                       f"{metrics['recall']:<10.4f} {metrics['roc_auc']:<10.4f}")
         
         print(f"{'='*60}")
-
-    def _load_model_with_fallback(self, config, model_type):
-        """Load model with fallback to alternative models if primary fails."""
-        primary_name = config['name']
-        try:
-            print(f"Loading {model_type.upper()} model: {primary_name}")
-            return config['class'](primary_name, self.device)
-        except Exception as e:
-            print(f"Failed to load {primary_name}: {str(e)[:100]}...")
-            # Try alternative models if available
-            if model_type in self.ALTERNATIVE_MODELS:
-                for alt_name in self.ALTERNATIVE_MODELS[model_type]:
-                    if alt_name != primary_name:  # Skip the one we already tried
-                        try:
-                            print(f"Trying alternative {model_type.upper()} model: {alt_name}")
-                            return config['class'](alt_name, self.device)
-                        except Exception as alt_e:
-                            print(f"Failed to load {alt_name}: {str(alt_e)[:100]}...")
-                            continue
-            # If all alternatives fail, raise the original error
-            raise e 
