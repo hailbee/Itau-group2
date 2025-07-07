@@ -102,7 +102,7 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
     
     def _load_model(self):
-        self.model = SiglipTextModel.from_pretrained(self.model_name).to(self.device)
+        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
     
     def encode_text(self, texts):
