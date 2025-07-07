@@ -84,13 +84,22 @@ class FLAVAModelWrapper(BaseVisionLanguageModel):
                 features = outputs.last_hidden_state.mean(dim=1)
             elif hasattr(outputs, 'pooler_output'):
                 features = outputs.pooler_output
+            elif hasattr(outputs, 'text_outputs') and hasattr(outputs.text_outputs, 'last_hidden_state'):
+                features = outputs.text_outputs.last_hidden_state.mean(dim=1)
             else:
-                # Fallback to logits
-                features = outputs.logits.mean(dim=1)
+                # Try to get any available tensor output
+                for attr in dir(outputs):
+                    if not attr.startswith('_') and hasattr(getattr(outputs, attr), 'shape'):
+                        tensor = getattr(outputs, attr)
+                        if len(tensor.shape) >= 2:
+                            features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
+                            break
+                else:
+                    raise ValueError(f"Could not extract features from FLAVA model output: {type(outputs)}")
         return F.normalize(features, dim=1)
 
 class ALIGNModelWrapper(BaseVisionLanguageModel):
-    """Wrapper for ALIGN models."""
+    """Wrapper for ALIGN/SigLIP models."""
     
     def _load_model(self):
         self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
@@ -99,17 +108,39 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.no_grad():
-            outputs = self.model(**inputs)
-            # ALIGN models have different output structures
+            # Try text-only first
+            try:
+                outputs = self.model(**inputs)
+            except Exception as e:
+                if "pixel_values" in str(e):
+                    # If model requires images, we'll use a dummy image
+                    batch_size = inputs['input_ids'].shape[0]
+                    dummy_images = torch.zeros(batch_size, 3, 224, 224).to(self.device)
+                    outputs = self.model(**inputs, pixel_values=dummy_images)
+                else:
+                    raise e
+            
+            # Extract features from different output structures
             if hasattr(outputs, 'text_embeds'):
                 features = outputs.text_embeds
             elif hasattr(outputs, 'pooler_output'):
                 features = outputs.pooler_output
             elif hasattr(outputs, 'last_hidden_state'):
                 features = outputs.last_hidden_state.mean(dim=1)
-            else:
-                # Fallback to logits
+            elif hasattr(outputs, 'text_outputs') and hasattr(outputs.text_outputs, 'last_hidden_state'):
+                features = outputs.text_outputs.last_hidden_state.mean(dim=1)
+            elif hasattr(outputs, 'logits'):
                 features = outputs.logits.mean(dim=1)
+            else:
+                # Try to get any available tensor output
+                for attr in dir(outputs):
+                    if not attr.startswith('_') and hasattr(getattr(outputs, attr), 'shape'):
+                        tensor = getattr(outputs, attr)
+                        if len(tensor.shape) >= 2:
+                            features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
+                            break
+                else:
+                    raise ValueError(f"Could not extract features from ALIGN/SigLIP model output: {type(outputs)}")
         return F.normalize(features, dim=1)
 
 class OpenCLIPModelWrapper(BaseVisionLanguageModel):
@@ -165,7 +196,7 @@ class BaselineTester:
         },
         'align': {
             'class': ALIGNModelWrapper,
-            'name': 'kakaobrain/align-base'  # ALIGN model from KakaoBrain
+            'name': 'google/siglip-base-patch16-224'  # SigLIP model (similar to ALIGN)
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
@@ -186,9 +217,10 @@ class BaselineTester:
             'facebook/flava-full'
         ],
         'align': [
+            'google/siglip-base-patch16-224',
+            'google/siglip-large-patch16-224',
             'kakaobrain/align-base',
-            'google/align-base',
-            'google/align-large'
+            'google/align-base'
         ]
     }
     
