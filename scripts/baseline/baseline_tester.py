@@ -186,7 +186,7 @@ class BaselineTester:
         },
         'align': {
             'class': ALIGNModelWrapper,
-            'name': 'google/siglip-base-patch16-224'  # SigLIP base model
+            'name': 'google/siglip-large-patch16-384'  # SigLIP base model
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
