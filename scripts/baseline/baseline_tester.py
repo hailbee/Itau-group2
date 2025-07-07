@@ -102,8 +102,22 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
     
     def _load_model(self):
-        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        try:
+            print(f"Loading SigLIP model: {self.model_name}")
+            # Try loading with trust_remote_code for SigLIP models
+            self.model = AutoModel.from_pretrained(
+                self.model_name, 
+                trust_remote_code=True,
+                torch_dtype=torch.float32
+            ).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name, 
+                trust_remote_code=True
+            )
+            print(f"Successfully loaded SigLIP model: {self.model_name}")
+        except Exception as e:
+            print(f"Error loading SigLIP model {self.model_name}: {str(e)}")
+            raise e
     
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
@@ -186,11 +200,11 @@ class BaselineTester:
         },
         'align': {
             'class': ALIGNModelWrapper,
-            'name': 'google/siglip-large-patch16-384'  # SigLIP base model
+            'name': 'kakaobrain/align-base'  # SigLIP base model
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
-            'name': 'ViT-L-14'  # OpenCLIP model name
+            'name': 'openai/clip-vit-large-patch14'  # OpenCLIP model name
         }
     }
     
