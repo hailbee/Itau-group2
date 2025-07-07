@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from abc import ABC, abstractmethod
-from transformers import CLIPModel, CLIPTokenizer, AutoModel, AutoTokenizer, SiglipTextModel
+from transformers import CLIPModel, CLIPTokenizer, AutoModel, AutoTokenizer
 from scripts.evaluation.evaluator import Evaluator
 
 class BaseVisionLanguageModel(ABC):
