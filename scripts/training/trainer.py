@@ -3,6 +3,9 @@ import csv
 from sklearn.metrics import precision_score, recall_score, roc_curve
 from utils.evals import find_best_threshold_youden
 from scripts.evaluation.evaluator import Evaluator
+from torch.utils.data import DataLoader, Subset, ConcatDataset
+import numpy as np
+import random
 from model_utils.loss.supcon_loss import SupConLoss
 from model_utils.loss.infonce_loss import InfoNCELoss
 
@@ -46,8 +49,9 @@ class Trainer:
         results_df, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
         return metrics
 
+    # pass in curriculum learning parameter 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None):
         """
         Main training loop with optional warmup.
         
@@ -63,6 +67,16 @@ class Trainer:
         Returns:
             dict: Best metrics achieved during training
         """
+        # bandit learning setup 
+        datasets = {
+            "easy": warmup_loader.dataset,
+            "hard": dataloader.dataset
+        }
+
+        # bandit learning tracking
+        rewards = {k: [] for k in datasets}
+        # keeping track of accuracy
+        prev_accuracy = 0.0
         best_metrics = {
             'accuracy': 0.0,
             'precision': 0.0,
@@ -82,9 +96,76 @@ class Trainer:
             writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC"])
 
             for epoch in range(epochs):
-                # Use warmup loader if provided and in warmup phase
-                current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
                 
+                # self paced curriculum learning
+                if curriculum == "self":
+                    hard_ratio = min(0.1 * epoch, 1.0)
+                    easy_ratio = 1.0 - hard_ratio
+
+                    total_samples = len(dataloader.dataset)
+                    num_easy = int(total_samples * easy_ratio)
+                    num_hard = total_samples - num_easy
+
+                    easy_indices = np.random.choice(len(warmup_loader.dataset), num_easy, replace=False)
+                    hard_indices = np.random.choice(len(dataloader.dataset), num_hard, replace=False)
+
+                    mixed_dataset = ConcatDataset([
+                        Subset(warmup_loader.dataset, easy_indices),
+                        Subset(dataloader.dataset, hard_indices)
+                    ])
+
+                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                
+                # bandit curriculum learning
+                elif curriculum == "bandit":
+
+                    # exploration rate
+                    epsilon = 0.1 
+                    reward_window = 5
+                    
+                    best_metrics = {
+                        'accuracy': 0.0,
+                        'precision': 0.0,
+                        'recall': 0.0,
+                        'roc_auc': 0.0
+                    }
+                    best_epochs = {
+                        'accuracy': -1,
+                        'precision': -1,
+                        'recall': -1,
+                        'roc_auc': -1
+                    }
+
+                     # Bandit curriculum learning
+                    if random.random() < epsilon:
+                        chosen_dataset_name = random.choice(["easy", "hard"])
+                    else:
+                        # reward estimation
+                        avg_rewards = {
+                            k: np.mean(v[-reward_window:]) if v else 0.0
+                            for k, v in rewards.items()
+                        }
+                        chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
+
+                    easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
+                    hard_batch_size = dataloader.batch_size - easy_batch_size
+
+                    easy_indices = np.random.choice(len(warmup_loader.dataset), easy_batch_size, replace=False)
+                    hard_indices = np.random.choice(len(dataloader.dataset), hard_batch_size, replace=False)
+
+                    mixed_dataset = ConcatDataset([
+                        Subset(warmup_loader.dataset, easy_indices),
+                        Subset(dataloader.dataset, hard_indices)
+                    ])
+
+                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                    mix_desc = f"bandit (chose {chosen_dataset_name})"
+                    print(mix_desc)
+
+                else:
+                    # non curriculum mode
+                    current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
+
                 # Train epoch
                 avg_loss = self.train_epoch(current_loader, mode)
                 print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
@@ -94,6 +175,11 @@ class Trainer:
 
                 # Evaluate
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
+
+                if curriculum == "bandit":
+                    delta_acc = metrics['accuracy'] - prev_accuracy
+                    prev_accuracy = metrics['accuracy']
+                    rewards[chosen_dataset_name].append(delta_acc)
                 
                 # Log metrics
                 writer.writerow([
