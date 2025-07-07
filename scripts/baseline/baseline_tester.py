@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from abc import ABC, abstractmethod
-from transformers import CLIPModel, CLIPTokenizer, AutoModel, AutoTokenizer
+from transformers import CLIPModel, CLIPTokenizer, AutoModel, AutoTokenizer, SiglipTextModel
 from scripts.evaluation.evaluator import Evaluator
 
 class BaseVisionLanguageModel(ABC):
@@ -102,7 +102,7 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
     
     def _load_model(self):
-        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
+        self.model = SiglipTextModel.from_pretrained(self.model_name).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
     
     def encode_text(self, texts):
@@ -182,11 +182,11 @@ class BaselineTester:
         },
         'flava': {
             'class': FLAVAModelWrapper,
-            'name': 'facebook/flava-base'  # FLAVA base model
+            'name': 'facebook/flava-full'  # FLAVA full model (actually exists)
         },
         'align': {
             'class': ALIGNModelWrapper,
-            'name': 'google/siglip-so400m-patch14-384'  # SigLIP text-only model
+            'name': 'google/siglip-so400m-patch14-384'  # SigLIP base model
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
@@ -302,3 +302,5 @@ class BaselineTester:
                       f"{metrics['recall']:<10.4f} {metrics['roc_auc']:<10.4f}")
         
         print(f"{'='*60}")
+
+ 
