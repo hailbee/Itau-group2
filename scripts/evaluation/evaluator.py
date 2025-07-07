@@ -12,7 +12,13 @@ class Evaluator:
     def __init__(self, model, batch_size=32):
         self.model = model
         self.batch_size = batch_size
-        self.extractor = EmbeddingExtractor(model)
+        # Check if model is already an embedding extractor
+        if hasattr(model, 'forward') and callable(model.forward):
+            # It's already an embedding extractor
+            self.extractor = model
+        else:
+            # Create embedding extractor from model
+            self.extractor = EmbeddingExtractor(model)
 
     def compute_similarities(self, reference_names, test_names):
         """Compute similarity matrix between reference and test names"""

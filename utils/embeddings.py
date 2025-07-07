@@ -26,7 +26,11 @@ def batched_embedding(extractor, names, batch_size=32):
     for i in range(0, len(names), batch_size):
         batch = names[i:i+batch_size]
         emb = extractor(batch)
-        embeddings.append(emb.cpu())
+        # Move to CPU for concatenation
+        if hasattr(emb, 'cpu'):
+            embeddings.append(emb.cpu())
+        else:
+            embeddings.append(emb)
     return torch.cat(embeddings, dim=0)
 
 def get_clip_embeddings(texts, batch_size=32):

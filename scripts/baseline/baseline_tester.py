@@ -138,6 +138,11 @@ class GeneralizedEmbeddingExtractor(nn.Module):
     
     def forward(self, texts):
         return self.model_wrapper.encode_text(texts)
+    
+    def to(self, device):
+        """Move the model wrapper to the specified device."""
+        self.model_wrapper.to(device)
+        return self
 
 class BaselineTester:
     """
