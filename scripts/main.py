@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--mode', type=str, 
                       choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'pbt', 'compare', 'baseline'], 
                       required=True,
-                      help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline')
+                      help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
     parser.add_argument('--reference_filepath', type=str, required=True,
                       help='Path to reference data')
     parser.add_argument('--test_reference_filepath', type=str, required=True,
@@ -26,6 +26,10 @@ def main():
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
                       help='Loss function type')
+    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'openclip', 'all'], default='clip',
+                      help='Baseline model to test (for baseline mode)')
+    parser.add_argument('--batch_size', type=int, default=32,
+                      help='Batch size for processing')
     parser.add_argument('--warmup_filepath', type=str,
                       help='Path to warmup data (optional)')
     
@@ -44,8 +48,6 @@ def main():
                       help='Number of training epochs')
     parser.add_argument('--warmup_epochs', type=int, default=5,
                       help='Number of warmup epochs')
-    parser.add_argument('--curriculum', type=str, default=None,
-                      help='Curriculum learning mode')
     parser.add_argument('--log_dir', type=str, default='/content/drive/MyDrive/Project_2_Business_Names/Summer 2025/code',
                       help='Directory to save results')
     parser.add_argument('--temperature', type=float, default=0.07,
@@ -78,11 +80,34 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if args.mode == 'baseline':
-        # Test raw CLIP performance
-        tester = BaselineTester()
-        results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath)
-        print("\nBaseline Results:")
-        print(metrics)
+        # Test baseline model(s) performance
+        if args.baseline_model == 'all':
+            # Test all available models
+            print("Testing all available baseline models...")
+            tester = BaselineTester(model_type='clip', batch_size=args.batch_size, device=device)
+            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath)
+            
+            print("\nBaseline Results Summary:")
+            for model_type, result in all_results.items():
+                if 'error' in result:
+                    print(f"{model_type.upper()}: ERROR - {result['error']}")
+                else:
+                    metrics = result['metrics']
+                    print(f"{model_type.upper()}: Accuracy={metrics['accuracy']:.4f}, "
+                          f"Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, "
+                          f"ROC AUC={metrics['roc_auc']:.4f}")
+        else:
+            # Test single model
+            print(f"Testing {args.baseline_model.upper()} baseline model...")
+            tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
+            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath)
+            
+            print(f"\n{args.baseline_model.upper()} Baseline Results:")
+            print(f"Accuracy: {metrics['accuracy']:.4f}")
+            print(f"Precision: {metrics['precision']:.4f}")
+            print(f"Recall: {metrics['recall']:.4f}")
+            print(f"ROC AUC: {metrics['roc_auc']:.4f}")
+            print(f"Optimal threshold: {metrics['threshold']:.4f}")
 
     elif args.mode == 'train':
         # Single training run
@@ -136,8 +161,7 @@ def main():
             mode=args.model_type,
             epochs=args.epochs,
             warmup_loader=None,  # You'll need to create appropriate dataloader
-            warmup_epochs=args.warmup_epochs,
-            curriculum = args.curriculum
+            warmup_epochs=args.warmup_epochs
         )
 
     elif args.mode == 'grid_search':
@@ -171,8 +195,7 @@ def main():
             warmup_filepath=args.warmup_filepath,
             epochs=args.epochs,
             warmup_epochs=args.warmup_epochs,
-            temperature=args.temperature,
-            curriculum=args.curriculum
+            temperature=args.temperature
         )
         
         print("\nGrid Search Results:")
