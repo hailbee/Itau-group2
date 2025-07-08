@@ -28,8 +28,7 @@ class BaseSiameseCLIP(nn.Module):
         )
 
     def encode(self, texts):
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.projector[0].weight.device)
-        with torch.no_grad():
-            features = self.clip.get_text_features(**inputs)
+        # Always use the wrapper's encode_text method for all backbones
+        features = self.clip.encode_text(texts)
         z = self.projector(features)
         return F.normalize(z, dim=1) 
