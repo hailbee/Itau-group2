@@ -27,7 +27,11 @@ class Trainer:
         
         for i, batch in enumerate(dataloader):
             # Unified logic: model and criterion handle all modes
-            outputs = self.model(*batch)
+            if mode == "triplet":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            else:
+                outputs = self.model(*batch)
             loss = self.criterion(*outputs)
 
             self.optimizer.zero_grad()

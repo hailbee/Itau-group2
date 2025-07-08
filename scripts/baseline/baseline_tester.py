@@ -117,7 +117,6 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
     def _load_model(self):
         try:
-            print(f"Loading SigLIP model: {self.model_name}")
             self.model = SiglipTextModel.from_pretrained(
                 self.model_name, 
                 trust_remote_code=True,
@@ -127,21 +126,14 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
                 self.model_name, 
                 trust_remote_code=True
             )
-            print(f"Successfully loaded SigLIP model: {self.model_name}")
         except Exception as e:
-            print(f"Error loading SigLIP model {self.model_name}: {str(e)}")
             raise e
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-        print("[DEBUG] About to call SigLIP model with inputs:", inputs, type(inputs))
         with torch.no_grad():
             try:
                 outputs = self.model(**inputs)
-                print("[DEBUG] SigLIP model call returned.")
-                print("[DEBUG] type(outputs):", type(outputs))
-                print("[DEBUG] repr(outputs):", repr(outputs))
             except Exception as e:
-                print("[DEBUG] Exception during SigLIP model call:", e)
                 raise
             # If outputs is a tuple or list, try each element
             if isinstance(outputs, (tuple, list)):
