@@ -118,7 +118,7 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
             raise e
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-        print("[DEBUG] About to call SigLIP model with inputs:", inputs)
+        print("[DEBUG] About to call SigLIP model with inputs:", inputs, type(inputs))
         with torch.no_grad():
             try:
                 outputs = self.model(**inputs)
