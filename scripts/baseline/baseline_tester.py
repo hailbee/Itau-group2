@@ -98,13 +98,11 @@ class FLAVAModelWrapper(BaseVisionLanguageModel):
                     raise ValueError(f"Could not extract features from FLAVA model output: {type(outputs)}")
         return F.normalize(features, dim=1)
 
-class ALIGNModelWrapper(BaseVisionLanguageModel):
+class SigLIPModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
-    
     def _load_model(self):
         try:
             print(f"Loading SigLIP model: {self.model_name}")
-            # Try loading with trust_remote_code for SigLIP models
             self.model = AutoModel.from_pretrained(
                 self.model_name, 
                 trust_remote_code=True,
@@ -118,13 +116,10 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
         except Exception as e:
             print(f"Error loading SigLIP model {self.model_name}: {str(e)}")
             raise e
-    
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
-            
-            # Extract features from different output structures
             if hasattr(outputs, 'text_embeds'):
                 features = outputs.text_embeds
             elif hasattr(outputs, 'pooler_output'):
@@ -136,7 +131,6 @@ class ALIGNModelWrapper(BaseVisionLanguageModel):
             elif hasattr(outputs, 'logits'):
                 features = outputs.logits.mean(dim=1)
             else:
-                # Try to get any available tensor output
                 for attr in dir(outputs):
                     if not attr.startswith('_') and hasattr(getattr(outputs, attr), 'shape'):
                         tensor = getattr(outputs, attr)
@@ -198,13 +192,13 @@ class BaselineTester:
             'class': FLAVAModelWrapper,
             'name': 'facebook/flava-full'  # FLAVA full model (actually exists)
         },
-        'align': {
-            'class': ALIGNModelWrapper,
-            'name': 'kakaobrain/align-base'  # SigLIP base model
+        'siglip': {
+            'class': SigLIPModelWrapper,
+            'name': 'google/siglip-base-patch16-224'  # SigLIP base model
         },
         'openclip': {
             'class': OpenCLIPModelWrapper,
-            'name': 'openai/clip-vit-large-patch14'  # OpenCLIP model name
+            'name': 'ViT-L-14'  # OpenCLIP model name (valid)
         }
     }
     
