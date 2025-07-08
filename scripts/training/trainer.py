@@ -47,9 +47,9 @@ class Trainer:
         return metrics
 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum=None):
         """
-        Main training loop with optional warmup.
+        Main training loop with optional warmup and optional curriculum.
         
         Args:
             dataloader: Main training dataloader

@@ -50,7 +50,7 @@ class GridSearcher:
     def search(self, reference_filepath, test_reference_filepath, test_filepath,
               lrs, batch_sizes, margins, internal_layer_sizes,
               mode="pair", loss_type="cosine", warmup_filepath=None,
-              epochs=5, warmup_epochs=5, curriculum = None, temperature=0.07):
+              epochs=5, warmup_epochs=5, temperature=0.07):
         """
         Perform grid search over hyperparameters.
         
@@ -124,16 +124,18 @@ class GridSearcher:
                               f"size={internal_layer_size}, loss={loss_type} ---")
 
                         # Train model
-                        best_metrics = trainer.train(
+                        train_kwargs = dict(
                             dataloader=dataloader,
                             test_reference_filepath=test_reference_filepath,
                             test_filepath=test_filepath,
                             mode=mode,
                             epochs=epochs,
                             warmup_loader=warmup_loader,
-                            warmup_epochs=warmup_epochs,
-                            curriculum=curriculum
+                            warmup_epochs=warmup_epochs
                         )
+                        if hasattr(self, 'curriculum') and self.curriculum is not None:
+                            train_kwargs['curriculum'] = self.curriculum
+                        best_metrics = trainer.train(**train_kwargs)
 
                         # Track best results
                         if best_metrics.get('loss', float('inf')) < best_loss:
@@ -220,5 +222,5 @@ class GridSearcher:
 
         from torch.utils.data import DataLoader
         # Use num_workers=0 for pair mode to avoid device mismatch issues
-        # num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4) 
+        num_workers = 0 if mode == "pair" else 4
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers) 
