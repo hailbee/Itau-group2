@@ -180,9 +180,12 @@ def main():
 
     elif args.mode == 'grid_search':
         # Grid search
+        from scripts.baseline.baseline_tester import BaselineTester
+        tester = BaselineTester(model_type=args.backbone, batch_size=1, device=device)
+        backbone_module = tester.model_wrapper
         def model_class_factory(embedding_dim, projection_dim):
             return get_siamese_model(args.model_type, args.backbone, embedding_dim=embedding_dim, projection_dim=projection_dim, device=device)
-        searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir)
+        searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir, backbone=backbone_module)
         
         lrs = ast.literal_eval(args.lrs)
         batch_sizes = ast.literal_eval(args.batch_sizes)
