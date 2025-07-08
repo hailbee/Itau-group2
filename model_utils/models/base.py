@@ -28,7 +28,16 @@ class BaseSiameseCLIP(nn.Module):
         )
 
     def encode(self, texts):
-        # Always use the wrapper's encode_text method for all backbones
-        features = self.clip.encode_text(texts)
+        # Handle CLIPModelWrapper and SigLIPModelWrapper differently
+        if hasattr(self.clip, 'encode_text'):
+            # For CLIPModelWrapper and similar wrappers
+            features = self.clip.encode_text(texts)
+        elif hasattr(self.clip, 'processor') and hasattr(self.clip, 'get_text_features'):
+            # For SigLIP-like models
+            inputs = self.clip.processor(text=texts, return_tensors="pt", padding=True, truncation=True).to(self.projector[0].weight.device)
+            with torch.no_grad():
+                features = self.clip.get_text_features(**inputs)
+        else:
+            raise ValueError(f"Backbone {type(self.clip)} does not support text encoding")
         z = self.projector(features)
         return F.normalize(z, dim=1) 
