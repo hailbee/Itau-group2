@@ -121,7 +121,17 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
         with torch.no_grad():
             outputs = self.model(**inputs)
             print("[DEBUG] SigLIP model output:", outputs)
-            # Try to extract features from known fields
+            # If outputs is a tuple or list, try each element
+            if isinstance(outputs, (tuple, list)):
+                for o in outputs:
+                    if o is not None and hasattr(o, 'shape') and len(o.shape) >= 2:
+                        return F.normalize(o, dim=1)
+            # If outputs is a dict, try each value
+            if isinstance(outputs, dict):
+                for v in outputs.values():
+                    if v is not None and hasattr(v, 'shape') and len(v.shape) >= 2:
+                        return F.normalize(v, dim=1)
+            # Try known fields
             for key in ['text_embeds', 'pooler_output', 'last_hidden_state', 'logits']:
                 if hasattr(outputs, key):
                     value = getattr(outputs, key)
@@ -133,7 +143,7 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
                         else:
                             features = value
                         return F.normalize(features, dim=1)
-            # Try to get any available tensor output
+            # Try any tensor attribute
             for attr in dir(outputs):
                 if not attr.startswith('_'):
                     tensor = getattr(outputs, attr)
