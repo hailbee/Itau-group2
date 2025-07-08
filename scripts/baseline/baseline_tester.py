@@ -131,40 +131,23 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.no_grad():
-            try:
-                outputs = self.model(**inputs)
-            except Exception as e:
-                raise
-            # If outputs is a tuple or list, try each element
-            if isinstance(outputs, (tuple, list)):
-                for o in outputs:
-                    if o is not None and hasattr(o, 'shape') and len(o.shape) >= 2:
-                        return F.normalize(o, dim=1)
-            # If outputs is a dict, try each value
-            if isinstance(outputs, dict):
-                for v in outputs.values():
-                    if v is not None and hasattr(v, 'shape') and len(v.shape) >= 2:
-                        return F.normalize(v, dim=1)
-            # Try known fields
-            for key in ['text_embeds', 'pooler_output', 'last_hidden_state', 'logits']:
-                if hasattr(outputs, key):
-                    value = getattr(outputs, key)
-                    if value is not None:
-                        if key == 'last_hidden_state':
-                            features = value.mean(dim=1)
-                        elif key == 'logits':
-                            features = value.mean(dim=1)
-                        else:
-                            features = value
-                        return F.normalize(features, dim=1)
-            # Try any tensor attribute
-            for attr in dir(outputs):
-                if not attr.startswith('_'):
-                    tensor = getattr(outputs, attr)
-                    if tensor is not None and hasattr(tensor, 'shape') and len(tensor.shape) >= 2:
-                        features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
-                        return F.normalize(features, dim=1)
-            raise ValueError(f"Could not extract features from SigLIP model output: {type(outputs)}; output: {outputs}")
+            outputs = self.model(**inputs)
+            # Always pool to [batch_size, hidden_size]
+            if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+                features = outputs.pooler_output  # [batch_size, hidden_size]
+            elif hasattr(outputs, 'last_hidden_state') and outputs.last_hidden_state is not None:
+                features = outputs.last_hidden_state.mean(dim=1)  # [batch_size, hidden_size]
+            else:
+                # fallback: find first 2D tensor in outputs
+                features = None
+                if isinstance(outputs, dict):
+                    for v in outputs.values():
+                        if v is not None and len(v.shape) == 2:
+                            features = v
+                            break
+                if features is None:
+                    raise ValueError(f"Could not extract 2D features from SigLIP model output: {type(outputs)}; output: {outputs}")
+        return F.normalize(features, dim=1)
 
     @property
     def embedding_dim(self):
