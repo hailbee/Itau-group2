@@ -83,9 +83,10 @@ def main():
 
     def get_siamese_model(mode, backbone_name, embedding_dim=512, projection_dim=128, device=None):
         from scripts.baseline.baseline_tester import BaselineTester
-        # Use BaselineTester to get the correct backbone wrapper
         tester = BaselineTester(model_type=backbone_name, batch_size=1, device=device)
         backbone_module = tester.model_wrapper  # Use the wrapper, not .model
+        print(f"[DEBUG] backbone_module type: {type(backbone_module)}")
+        assert hasattr(backbone_module, 'encode_text'), f"Backbone {type(backbone_module)} does not have encode_text"
         if mode == 'pair':
             from model_utils.models.siamese import SiameseCLIPModelPairs
             return SiameseCLIPModelPairs(embedding_dim, projection_dim, backbone=backbone_module)
