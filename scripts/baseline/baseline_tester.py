@@ -118,9 +118,16 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
             raise e
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
+        print("[DEBUG] About to call SigLIP model with inputs:", inputs)
         with torch.no_grad():
-            outputs = self.model(**inputs)
-            print("[DEBUG] SigLIP model output:", outputs)
+            try:
+                outputs = self.model(**inputs)
+                print("[DEBUG] SigLIP model call returned.")
+                print("[DEBUG] type(outputs):", type(outputs))
+                print("[DEBUG] repr(outputs):", repr(outputs))
+            except Exception as e:
+                print("[DEBUG] Exception during SigLIP model call:", e)
+                raise
             # If outputs is a tuple or list, try each element
             if isinstance(outputs, (tuple, list)):
                 for o in outputs:
