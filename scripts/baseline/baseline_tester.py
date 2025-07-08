@@ -120,26 +120,27 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
-            if hasattr(outputs, 'text_embeds'):
-                features = outputs.text_embeds
-            elif hasattr(outputs, 'pooler_output'):
-                features = outputs.pooler_output
-            elif hasattr(outputs, 'last_hidden_state'):
-                features = outputs.last_hidden_state.mean(dim=1)
-            elif hasattr(outputs, 'text_outputs') and hasattr(outputs.text_outputs, 'last_hidden_state'):
-                features = outputs.text_outputs.last_hidden_state.mean(dim=1)
-            elif hasattr(outputs, 'logits'):
-                features = outputs.logits.mean(dim=1)
-            else:
-                for attr in dir(outputs):
-                    if not attr.startswith('_') and hasattr(getattr(outputs, attr), 'shape'):
-                        tensor = getattr(outputs, attr)
-                        if len(tensor.shape) >= 2:
-                            features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
-                            break
-                else:
-                    raise ValueError(f"Could not extract features from SigLIP model output: {type(outputs)}")
-        return F.normalize(features, dim=1)
+            print("[DEBUG] SigLIP model output:", outputs)
+            # Try to extract features from known fields
+            for key in ['text_embeds', 'pooler_output', 'last_hidden_state', 'logits']:
+                if hasattr(outputs, key):
+                    value = getattr(outputs, key)
+                    if value is not None:
+                        if key == 'last_hidden_state':
+                            features = value.mean(dim=1)
+                        elif key == 'logits':
+                            features = value.mean(dim=1)
+                        else:
+                            features = value
+                        return F.normalize(features, dim=1)
+            # Try to get any available tensor output
+            for attr in dir(outputs):
+                if not attr.startswith('_'):
+                    tensor = getattr(outputs, attr)
+                    if tensor is not None and hasattr(tensor, 'shape') and len(tensor.shape) >= 2:
+                        features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
+                        return F.normalize(features, dim=1)
+            raise ValueError(f"Could not extract features from SigLIP model output: {type(outputs)}; output: {outputs}")
 
 class OpenCLIPModelWrapper(BaseVisionLanguageModel):
     """Wrapper for OpenCLIP models."""
