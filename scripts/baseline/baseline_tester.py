@@ -49,7 +49,7 @@ class CoCaModelWrapper(BaseVisionLanguageModel):
     """Wrapper for CoCa/GIT models."""
     
     def _load_model(self):
-        self.model = SiglipTextModel.from_pretrained(self.model_name).to(self.device)
+        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
     
     def encode_text(self, texts):
@@ -103,7 +103,7 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
     def _load_model(self):
         try:
             print(f"Loading SigLIP model: {self.model_name}")
-            self.model = AutoModel.from_pretrained(
+            self.model = SiglipTextModel.from_pretrained(
                 self.model_name, 
                 trust_remote_code=True,
                 torch_dtype=torch.float32
