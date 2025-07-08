@@ -95,7 +95,7 @@ class GridSearcher:
                     for margin in margins:
                         # Create model and optimizer
                         model = self.model_class(
-                            embedding_dim=512,
+                            embedding_dim=self.backbone.embedding_dim,
                             projection_dim=internal_layer_size
                         ).to(self.device)
                         
