@@ -8,6 +8,8 @@ class SiameseCLIPSupCon(BaseSiameseCLIP):
     Siamese network for SupCon learning using CLIP as backbone.
     Handles multiple positive and negative examples per anchor.
     """
+    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
+        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
     def forward(self, anchor_text, positive_texts, negative_texts):
         """
         Forward pass for SupCon learning (batched).

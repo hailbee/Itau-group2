@@ -28,6 +28,8 @@ def main():
                       help='Loss function type')
     parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'openclip', 'all'], default='clip',
                       help='Baseline model to test (for baseline mode)')
+    parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip', 'openclip'], default='clip',
+                      help='Vision-language backbone to use (clip, siglip, flava, etc.)')
     parser.add_argument('--batch_size', type=int, default=32,
                       help='Batch size for processing')
     parser.add_argument('--warmup_filepath', type=str,
@@ -79,6 +81,27 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    def get_siamese_model(mode, backbone_name, embedding_dim=512, projection_dim=128, device=None):
+        from scripts.baseline.baseline_tester import BaselineTester
+        # Use BaselineTester to get the correct backbone wrapper
+        tester = BaselineTester(model_type=backbone_name, batch_size=1, device=device)
+        backbone_module = tester.model_wrapper.model
+        tokenizer = tester.model_wrapper.tokenizer
+        if mode == 'pair':
+            from model_utils.models.siamese import SiameseCLIPModelPairs
+            return SiameseCLIPModelPairs(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+        elif mode == 'triplet':
+            from model_utils.models.siamese import SiameseCLIPTriplet
+            return SiameseCLIPTriplet(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+        elif mode == 'supcon':
+            from model_utils.models.supcon import SiameseCLIPSupCon
+            return SiameseCLIPSupCon(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+        elif mode == 'infonce':
+            from model_utils.models.infonce import SiameseCLIPInfoNCE
+            return SiameseCLIPInfoNCE(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
     if args.mode == 'baseline':
         # Test baseline model(s) performance
         if args.baseline_model == 'all':
@@ -111,16 +134,7 @@ def main():
 
     elif args.mode == 'train':
         # Single training run
-        if args.model_type == 'pair':
-            model_class = SiameseCLIPModelPairs
-        elif args.model_type == 'triplet':
-            model_class = SiameseCLIPTriplet
-        elif args.model_type == 'supcon':
-            model_class = SiameseCLIPSupCon
-        else:  # infonce
-            model_class = SiameseCLIPInfoNCE
-            
-        model = model_class(embedding_dim=512, projection_dim=128).to(device)
+        model = get_siamese_model(args.model_type, args.backbone, embedding_dim=512, projection_dim=128, device=device).to(device)
         
         # Get appropriate loss class
         if args.model_type == 'pair':
@@ -166,16 +180,9 @@ def main():
 
     elif args.mode == 'grid_search':
         # Grid search
-        if args.model_type == 'pair':
-            model_class = SiameseCLIPModelPairs
-        elif args.model_type == 'triplet':
-            model_class = SiameseCLIPTriplet
-        elif args.model_type == 'supcon':
-            model_class = SiameseCLIPSupCon
-        else:  # infonce
-            model_class = SiameseCLIPInfoNCE
-            
-        searcher = GridSearcher(model_class, device, log_dir=args.log_dir)
+        def model_class_factory(embedding_dim, projection_dim):
+            return get_siamese_model(args.model_type, args.backbone, embedding_dim=embedding_dim, projection_dim=projection_dim, device=device)
+        searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir)
         
         lrs = ast.literal_eval(args.lrs)
         batch_sizes = ast.literal_eval(args.batch_sizes)

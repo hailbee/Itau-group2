@@ -8,12 +8,16 @@ clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
 
 class BaseSiameseCLIP(nn.Module):
-    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True):
+    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
         super().__init__()
-        self.clip = clip_model
-        self.tokenizer = clip_tokenizer
+        if backbone is not None and tokenizer is not None:
+            self.clip = backbone
+            self.tokenizer = tokenizer
+        else:
+            self.clip = clip_model
+            self.tokenizer = clip_tokenizer
 
-        if freeze_clip:
+        if freeze_clip and hasattr(self.clip, 'parameters'):
             for param in self.clip.parameters():
                 param.requires_grad = False
 
@@ -24,7 +28,7 @@ class BaseSiameseCLIP(nn.Module):
         )
 
     def encode(self, texts):
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.clip.device)
+        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.projector[0].weight.device)
         with torch.no_grad():
             features = self.clip.get_text_features(**inputs)
         z = self.projector(features)

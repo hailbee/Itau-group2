@@ -8,6 +8,8 @@ class SiameseCLIPInfoNCE(BaseSiameseCLIP):
     Siamese network for InfoNCE learning using CLIP as backbone.
     Handles one positive and multiple negative examples per anchor.
     """
+    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
+        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
     def forward(self, anchor_text, positive_text, negative_texts):
         """
         Forward pass for InfoNCE learning (batched).
