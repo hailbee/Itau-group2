@@ -129,7 +129,7 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
         except Exception as e:
             raise e
     def encode_text(self, texts):
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
+        inputs = self.tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
             # Always pool to [batch_size, hidden_size]
