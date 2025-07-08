@@ -85,20 +85,19 @@ def main():
         from scripts.baseline.baseline_tester import BaselineTester
         # Use BaselineTester to get the correct backbone wrapper
         tester = BaselineTester(model_type=backbone_name, batch_size=1, device=device)
-        backbone_module = tester.model_wrapper.model
-        tokenizer = tester.model_wrapper.tokenizer
+        backbone_module = tester.model_wrapper  # Use the wrapper, not .model
         if mode == 'pair':
             from model_utils.models.siamese import SiameseCLIPModelPairs
-            return SiameseCLIPModelPairs(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+            return SiameseCLIPModelPairs(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'triplet':
             from model_utils.models.siamese import SiameseCLIPTriplet
-            return SiameseCLIPTriplet(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+            return SiameseCLIPTriplet(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'supcon':
             from model_utils.models.supcon import SiameseCLIPSupCon
-            return SiameseCLIPSupCon(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+            return SiameseCLIPSupCon(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'infonce':
             from model_utils.models.infonce import SiameseCLIPInfoNCE
-            return SiameseCLIPInfoNCE(embedding_dim, projection_dim, backbone=backbone_module, tokenizer=tokenizer)
+            return SiameseCLIPInfoNCE(embedding_dim, projection_dim, backbone=backbone_module)
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
