@@ -209,23 +209,51 @@ class BaselineTester:
         Initialize baseline tester with specified model.
         
         Args:
-            model_type: One of 'clip', 'coca', 'flava', 'align', 'openclip'
+            model_type: One of 'clip', 'coca', 'flava', 'siglip', 'openclip'
             batch_size: Batch size for processing
             device: Device to run on (auto-detected if None)
         """
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         self.model_type = model_type
-        
+
+        print(f"[DEBUG] Requested model_type: {model_type}")
+
         if model_type not in self.MODEL_CONFIGS:
             raise ValueError(f"Unsupported model type: {model_type}. "
                            f"Supported types: {list(self.MODEL_CONFIGS.keys())}")
-        
-        # Load model wrapper
+
         config = self.MODEL_CONFIGS[model_type]
-        self.model_wrapper = config['class'](config['name'], self.device)
-        
-        # Create embedding extractor and evaluator
+        if model_type == 'siglip':
+            siglip_candidates = [
+                config['name'],
+                'google/siglip-base-patch16-384',
+                'google/siglip-large-patch16-224',
+                'google/siglip-large-patch16-384',
+                'google/siglip-so400m-patch14-224',
+                'google/siglip-so400m-patch14-384',
+            ]
+            last_error = None
+            for candidate in siglip_candidates:
+                print(f"[DEBUG] Attempting to load SigLIP model: {candidate}")
+                try:
+                    self.model_wrapper = config['class'](candidate, self.device)
+                    print(f"[DEBUG] Successfully loaded SigLIP model: {candidate}")
+                    break
+                except Exception as e:
+                    print(f"[ERROR] Failed to load SigLIP model {candidate}: {e}")
+                    last_error = e
+            else:
+                print("[ERROR] All SigLIP model candidates failed to load.")
+                raise last_error
+        else:
+            try:
+                self.model_wrapper = config['class'](config['name'], self.device)
+                print(f"[DEBUG] Successfully loaded model: {model_type} ({config['name']})")
+            except Exception as e:
+                print(f"[ERROR] Failed to load model {model_type}: {e}")
+                raise e
+
         self.extractor = GeneralizedEmbeddingExtractor(self.model_wrapper)
         self.evaluator = Evaluator(self.extractor, batch_size=batch_size)
 
@@ -273,7 +301,7 @@ class BaselineTester:
             print(f"\n{'='*50}")
             print(f"Testing {model_type.upper()}")
             print(f"{'='*50}")
-            
+            print(f"[DEBUG] Attempting to load and test model_type: {model_type}")
             try:
                 # Create new tester for each model
                 tester = BaselineTester(model_type, self.batch_size, self.device)
