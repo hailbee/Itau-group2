@@ -114,8 +114,7 @@ class SigLIPModelWrapper(BaseVisionLanguageModel):
         inputs = self.tokenizer(
             texts, 
             return_tensors="pt", 
-            padding=True, 
-            truncation=True
+            padding="max_length"
         ).to(self.device)
 
         with torch.no_grad():
