@@ -100,64 +100,30 @@ class FLAVAModelWrapper(BaseVisionLanguageModel):
 
 class SigLIPModelWrapper(BaseVisionLanguageModel):
     """Wrapper for SigLIP text-only models."""
+
     def _load_model(self):
-        try:
-            print(f"Loading SigLIP model: {self.model_name}")
-            self.model = SiglipTextModel.from_pretrained(
-                self.model_name, 
-                trust_remote_code=True,
-                torch_dtype=torch.float32
-            ).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name, 
-                trust_remote_code=True
-            )
-            print(f"Successfully loaded SigLIP model: {self.model_name}")
-        except Exception as e:
-            print(f"Error loading SigLIP model {self.model_name}: {str(e)}")
-            raise e
+        print(f"Loading SigLIP model: {self.model_name}")
+        self.model = SiglipTextModel.from_pretrained(
+            self.model_name,
+            torch_dtype=torch.float32
+        ).to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        print(f"Successfully loaded SigLIP model: {self.model_name}")
+
     def encode_text(self, texts):
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
-        print("[DEBUG] About to call SigLIP model with inputs:", inputs, type(inputs))
+        inputs = self.tokenizer(
+            texts, 
+            return_tensors="pt", 
+            padding=True, 
+            truncation=True
+        ).to(self.device)
+
         with torch.no_grad():
-            try:
-                outputs = self.model(**inputs)
-                print("[DEBUG] SigLIP model call returned.")
-                print("[DEBUG] type(outputs):", type(outputs))
-                print("[DEBUG] repr(outputs):", repr(outputs))
-            except Exception as e:
-                print("[DEBUG] Exception during SigLIP model call:", e)
-                raise
-            # If outputs is a tuple or list, try each element
-            if isinstance(outputs, (tuple, list)):
-                for o in outputs:
-                    if o is not None and hasattr(o, 'shape') and len(o.shape) >= 2:
-                        return F.normalize(o, dim=1)
-            # If outputs is a dict, try each value
-            if isinstance(outputs, dict):
-                for v in outputs.values():
-                    if v is not None and hasattr(v, 'shape') and len(v.shape) >= 2:
-                        return F.normalize(v, dim=1)
-            # Try known fields
-            for key in ['text_embeds', 'pooler_output', 'last_hidden_state', 'logits']:
-                if hasattr(outputs, key):
-                    value = getattr(outputs, key)
-                    if value is not None:
-                        if key == 'last_hidden_state':
-                            features = value.mean(dim=1)
-                        elif key == 'logits':
-                            features = value.mean(dim=1)
-                        else:
-                            features = value
-                        return F.normalize(features, dim=1)
-            # Try any tensor attribute
-            for attr in dir(outputs):
-                if not attr.startswith('_'):
-                    tensor = getattr(outputs, attr)
-                    if tensor is not None and hasattr(tensor, 'shape') and len(tensor.shape) >= 2:
-                        features = tensor.mean(dim=1) if len(tensor.shape) > 2 else tensor
-                        return F.normalize(features, dim=1)
-            raise ValueError(f"Could not extract features from SigLIP model output: {type(outputs)}; output: {outputs}")
+            outputs = self.model(**inputs)
+            features = outputs.pooler_output  # (batch_size, hidden_size)
+
+        return F.normalize(features, dim=1)
+
 
 class OpenCLIPModelWrapper(BaseVisionLanguageModel):
     """Wrapper for OpenCLIP models."""
