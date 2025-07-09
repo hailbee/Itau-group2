@@ -15,10 +15,14 @@ class GridSearcher:
     Unified grid search interface for hyperparameter optimization.
     """
     def __init__(self, model_class, device, log_dir="grid_search_results", backbone=None):
+        import os
         self.model_class = model_class
         self.device = device
         self.log_dir = log_dir
         self.backbone = backbone
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
 
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""
