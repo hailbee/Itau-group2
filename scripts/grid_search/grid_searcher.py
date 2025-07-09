@@ -97,9 +97,13 @@ class GridSearcher:
             for internal_layer_size in internal_layer_sizes:
                 for lr in lrs:
                     for margin in margins:
+                        # Ensure embedding_dim is an int
+                        embedding_dim = self.backbone.embedding_dim
+                        if isinstance(embedding_dim, (tuple, list)):
+                            embedding_dim = embedding_dim[0]
                         # Create model and optimizer
                         model = self.model_class(
-                            self.backbone.embedding_dim,
+                            embedding_dim,
                             internal_layer_size
                         ).to(self.device)
                         
