@@ -183,11 +183,15 @@ def main():
         tester = BaselineTester(model_type=args.backbone, batch_size=1, device=device)
         backbone_module = tester.model_wrapper
         def model_class_factory(embedding_dim, projection_dim):
-            # Ensure both parameters are integers
+            # Debug print statements
+            print(f"[DEBUG] model_class_factory received: embedding_dim={embedding_dim} ({type(embedding_dim)}), projection_dim={projection_dim} ({type(projection_dim)})")
             if isinstance(embedding_dim, (tuple, list)):
+                print(f"[DEBUG] embedding_dim before fix: {embedding_dim} ({type(embedding_dim)})")
                 embedding_dim = embedding_dim[0]
             if isinstance(projection_dim, (tuple, list)):
+                print(f"[DEBUG] projection_dim before fix: {projection_dim} ({type(projection_dim)})")
                 projection_dim = projection_dim[0]
+            print(f"[DEBUG] model_class_factory after fix: embedding_dim={embedding_dim} ({type(embedding_dim)}), projection_dim={projection_dim} ({type(projection_dim)})")
             return get_siamese_model(args.model_type, args.backbone, embedding_dim=embedding_dim, projection_dim=projection_dim, device=device)
         searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir, backbone=backbone_module)
         
