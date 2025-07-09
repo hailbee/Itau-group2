@@ -21,6 +21,23 @@ class EmbeddingExtractor(nn.Module):
         projected = self.projector(features)
         return F.normalize(projected, dim=1)
 
+class SupConEmbeddingExtractor(nn.Module):
+    """
+    Specialized embedding extractor for SupCon models that can handle single text input for evaluation.
+    """
+    def __init__(self, siamese_model):
+        super().__init__()
+        self.clip = siamese_model.clip
+        self.projector = siamese_model.projector
+
+    def forward(self, texts):
+        # For evaluation, we just need to encode the texts normally
+        inputs = clip_tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.projector[0].weight.device)
+        with torch.no_grad():
+            features = self.clip.get_text_features(**inputs)
+        projected = self.projector(features)
+        return F.normalize(projected, dim=1)
+
 def batched_embedding(extractor, names, batch_size=32):
     embeddings = []
     for i in range(0, len(names), batch_size):

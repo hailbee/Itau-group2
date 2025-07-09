@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import pandas as pd
 from sklearn.metrics import roc_curve, precision_score, recall_score, accuracy_score, roc_auc_score
 from utils.evals import find_best_threshold_youden
-from utils.embeddings import EmbeddingExtractor, batched_embedding
+from utils.embeddings import EmbeddingExtractor, SupConEmbeddingExtractor, batched_embedding
 
 class Evaluator:
     """
@@ -17,8 +17,13 @@ class Evaluator:
             # It's already an embedding extractor
             self.extractor = model
         else:
-            # Create embedding extractor from model
-            self.extractor = EmbeddingExtractor(model)
+            # Create embedding extractor from model based on model type
+            if hasattr(model, '__class__') and ('SupCon' in model.__class__.__name__ or 'InfoNCE' in model.__class__.__name__):
+                # Use specialized extractor for SupCon and InfoNCE models
+                self.extractor = SupConEmbeddingExtractor(model)
+            else:
+                # Use standard extractor for other models
+                self.extractor = EmbeddingExtractor(model)
 
     def compute_similarities(self, reference_names, test_names):
         """Compute similarity matrix between reference and test names"""
