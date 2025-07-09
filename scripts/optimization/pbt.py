@@ -144,6 +144,15 @@ class PopulationBasedTrainer(BaseOptimizer):
                 
                 print(f"Training population member {i+1}/{len(population)}")
                 
+                # Log parameters for this population member
+                params = population[i]
+                param_str = f"LR: {params['lr']:.6f}, Batch: {params['batch_size']}, Layer: {params['internal_layer_size']}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}"
+                if mode in ["supcon", "infonce"]:
+                    param_str += f", Temp: {params['temperature']:.4f}"
+                else:
+                    param_str += f", Margin: {params['margin']:.4f}"
+                print(f"Member {i+1} parameters: {param_str}")
+                
                 # Get loss class and create criterion
                 loss_class = self.get_loss_class(mode, loss_type)
                 if mode in ["supcon", "infonce"]:

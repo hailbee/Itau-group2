@@ -204,6 +204,19 @@ class BaseOptimizer:
         
         return samples
     
+    def sample_initial_hyperparameters(self, mode, n_samples):
+        """
+        Sample initial hyperparameters for optimization (alias for sample_hyperparameters).
+        
+        Args:
+            mode: Training mode
+            n_samples: Number of samples to generate
+            
+        Returns:
+            List of parameter dictionaries
+        """
+        return self.sample_hyperparameters(mode, n_samples)
+    
     def evaluate_trial(self, params, reference_filepath, test_reference_filepath,
                       test_filepath, mode, loss_type, warmup_filepath=None,
                       epochs=5, warmup_epochs=5):
@@ -218,6 +231,14 @@ class BaseOptimizer:
             batch_size = int(params['batch_size'])
             internal_layer_size = int(params['internal_layer_size'])
             lr = float(params['lr'])
+            
+            # Log parameters being tested
+            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}"
+            if mode in ["supcon", "infonce"]:
+                param_str += f", Temp: {params['temperature']:.4f}"
+            else:
+                param_str += f", Margin: {params['margin']:.4f}"
+            print(f"Testing parameters: {param_str}")
             
             # Load data
             dataframe = pd.read_pickle(reference_filepath)

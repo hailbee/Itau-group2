@@ -143,8 +143,6 @@ class UnifiedHyperparameterOptimizer:
         """
         Run hyperparameter optimization using the specified method.
         """
-        print(f"Starting {method} optimization for {self.model_type} model")
-        
         # Filter kwargs for each optimizer
         if method == "bayesian":
             allowed = ["n_calls", "n_random_starts", "epochs", "warmup_epochs"]
