@@ -73,7 +73,7 @@ class OptunaOptimizer(BaseOptimizer):
         try:
             # Print trial separator
             print(f"\n{'='*50}")
-            print(f"Starting Trial {trial.number}")
+            print(f"Starting Trial {trial.number + 1}")
             print(f"{'='*50}")
             
             # Use the base class evaluate_trial method
@@ -83,15 +83,15 @@ class OptunaOptimizer(BaseOptimizer):
             )
             
             # Add trial number to result
-            result["trial_number"] = trial.number
+            result["trial_number"] = trial.number + 1
             
             # Print trial result with better spacing
-            print(f"\nTrial {trial.number} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nTrial {trial.number + 1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
             
             return result.get('test_accuracy', 0.0)
             
         except Exception as e:
-            print(f"\nTrial {trial.number} failed with error: {e}")
+            print(f"\nTrial {trial.number + 1} failed with error: {e}")
             return 0.0
     
     def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
