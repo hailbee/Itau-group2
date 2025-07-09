@@ -6,6 +6,9 @@ from scripts.evaluation.evaluator import Evaluator
 from scripts.grid_search.grid_searcher import GridSearcher
 from scripts.baseline.baseline_tester import BaselineTester
 from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
+from model_utils.models.learning.siamese import SiameseModelPairs, SiameseModelTriplet
+from model_utils.models.learning.supcon import SiameseModelSupCon
+from model_utils.models.learning.infonce import SiameseModelInfoNCE
 
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
