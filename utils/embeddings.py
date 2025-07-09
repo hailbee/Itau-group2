@@ -11,15 +11,11 @@ clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
 class EmbeddingExtractor(nn.Module):
     def __init__(self, siamese_model):
         super().__init__()
-        self.clip = siamese_model.clip
-        self.projector = siamese_model.projector
+        self.siamese_model = siamese_model
 
     def forward(self, texts):
-        inputs = clip_tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.projector[0].weight.device)
-        with torch.no_grad():
-            features = self.clip.get_text_features(**inputs)
-        projected = self.projector(features)
-        return F.normalize(projected, dim=1)
+        # Use the siamese model's encode method which handles the backbone and projection
+        return self.siamese_model.encode(texts)
 
 class SupConEmbeddingExtractor(nn.Module):
     """

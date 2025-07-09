@@ -20,7 +20,8 @@ class Evaluator:
             print("USING SUPCON EMBEDDING EXTRACTOR")
             self.extractor = SupConEmbeddingExtractor(model)
         else:
-            print("FUCKKKKKKK # Use standard extractor for other models (pair, triplet)")
+            # Use standard extractor for other models (pair, triplet)
+            print("USING STANDARD EMBEDDING EXTRACTOR")
             self.extractor = EmbeddingExtractor(model)
 
     def compute_similarities(self, reference_names, test_names):
