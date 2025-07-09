@@ -102,17 +102,21 @@ class PopulationBasedTrainer(BaseOptimizer):
         warmup_loaders = []
         
         for i, params in enumerate(population):
+            # Convert numpy types to Python types
+            batch_size = int(params['batch_size'])
+            internal_layer_size = int(params['internal_layer_size'])
+            
             # Create dataloader
-            dataloader = self.create_dataloader(dataframe, params['batch_size'], mode)
+            dataloader = self.create_dataloader(dataframe, batch_size, mode)
             dataloaders.append(dataloader)
             
             warmup_loader = None
             if warmup_dataframe is not None:
-                warmup_loader = self.create_dataloader(warmup_dataframe, params['batch_size'], mode)
+                warmup_loader = self.create_dataloader(warmup_dataframe, batch_size, mode)
             warmup_loaders.append(warmup_loader)
             
             # Create model
-            model = self.create_siamese_model(mode, params['internal_layer_size']).to(self.device)
+            model = self.create_siamese_model(mode, internal_layer_size).to(self.device)
             models.append(model)
             
             # Create optimizer
@@ -130,7 +134,7 @@ class PopulationBasedTrainer(BaseOptimizer):
             trainers.append(trainer)
             
             # Create evaluator
-            evaluator = Evaluator(model, batch_size=params['batch_size'])
+            evaluator = Evaluator(model, batch_size=batch_size)
             evaluators.append(evaluator)
         
         # Training loop with evolution

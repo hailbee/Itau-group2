@@ -27,12 +27,10 @@ class SigLIPModelWrapper:
             )
         self.model = SiglipTextModel.from_pretrained(
             self.model_name, 
-            trust_remote_code=True,
             torch_dtype=torch.float32
         ).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name, 
-            trust_remote_code=True
+            self.model_name
         )
     
     def encode_text(self, texts):

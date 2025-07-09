@@ -155,9 +155,18 @@ class OptunaOptimizer(BaseOptimizer):
         # Save results
         self._save_results(study)
         
+        # Find best results from our results list
+        if self.results:
+            best_result = max(self.results, key=lambda x: x.get('test_auc', 0))
+            best_auc = best_result.get('test_auc', 0)
+            best_accuracy = best_result.get('test_accuracy', 0)
+        else:
+            best_auc = 0
+            best_accuracy = 0
+        
         print(f"Optuna optimization completed!")
-        print(f"Best AUC: {self.best_auc:.4f}")
-        print(f"Best Accuracy: {self.best_accuracy:.4f}")
+        print(f"Best AUC: {best_auc:.4f}")
+        print(f"Best Accuracy: {best_accuracy:.4f}")
         print(f"Best trial: {study.best_trial.number}")
         print(f"Best parameters: {study.best_params}")
         
