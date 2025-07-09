@@ -6,12 +6,6 @@ from scripts.evaluation.evaluator import Evaluator
 from scripts.grid_search.grid_searcher import GridSearcher
 from scripts.baseline.baseline_tester import BaselineTester
 from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
-from model_utils.models.learning import (
-    SiameseModelPairs, 
-    SiameseModelTriplet,
-    SiameseModelSupCon,
-    SiameseModelInfoNCE
-)
 
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
@@ -53,7 +47,7 @@ def main():
                       help='Number of training epochs')
     parser.add_argument('--warmup_epochs', type=int, default=5,
                       help='Number of warmup epochs')
-    parser.add_argument('--log_dir', type=str, default='/content/drive/MyDrive/Project_2_Business_Names/Summer 2025/code',
+    parser.add_argument('--log_dir', type=str, default='results',
                       help='Directory to save results')
     parser.add_argument('--temperature', type=float, default=0.07,
                       help='Temperature parameter for SupCon/InfoNCE loss (default: 0.07)')
@@ -225,16 +219,7 @@ def main():
 
     elif args.mode in ['bayesian', 'random', 'optuna', 'pbt']:
         # Advanced hyperparameter optimization
-        if args.model_type == 'pair':
-            model_class = SiameseModelPairs
-        elif args.model_type == 'triplet':
-            model_class = SiameseModelTriplet
-        elif args.model_type == 'supcon':
-            model_class = SiameseModelSupCon
-        else:  # infonce
-            model_class = SiameseModelInfoNCE
-        
-        optimizer = UnifiedHyperparameterOptimizer(model_class, device, log_dir=args.log_dir)
+        optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=device, log_dir=args.log_dir)
         
         # Prepare optimization parameters
         opt_params = {
@@ -252,7 +237,7 @@ def main():
             'warmup_epochs': args.warmup_epochs
         }
         
-        best_config, results_df, additional_info = optimizer.optimize(
+        results = optimizer.optimize(
             method=args.mode,
             reference_filepath=args.reference_filepath,
             test_reference_filepath=args.test_reference_filepath,
@@ -264,22 +249,17 @@ def main():
         )
         
         print(f"\n{args.mode.upper()} Optimization Results:")
-        print(f"Best configuration: {best_config}")
-        print(f"Best accuracy: {best_config.get('best_accuracy', 'N/A')}")
+        print(f"Number of trials completed: {len(results)}")
+        if results:
+            best_auc = max(r.get('test_auc', 0) for r in results)
+            best_accuracy = max(r.get('test_accuracy', 0) for r in results)
+            print(f"Best AUC: {best_auc:.4f}")
+            print(f"Best Accuracy: {best_accuracy:.4f}")
         print(f"\nAll results saved to: {args.log_dir}")
 
     elif args.mode == 'compare':
         # Compare different optimization methods
-        if args.model_type == 'pair':
-            model_class = SiameseModelPairs
-        elif args.model_type == 'triplet':
-            model_class = SiameseModelTriplet
-        elif args.model_type == 'supcon':
-            model_class = SiameseModelSupCon
-        else:  # infonce
-            model_class = SiameseModelInfoNCE
-        
-        optimizer = UnifiedHyperparameterOptimizer(model_class, device, log_dir=args.log_dir)
+        optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=device, log_dir=args.log_dir)
         
         # Prepare optimization parameters
         opt_params = {

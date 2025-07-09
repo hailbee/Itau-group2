@@ -25,19 +25,15 @@ class SigLIPModelWrapper:
                 "SigLIP models require the 'sentencepiece' library. "
                 "Please install it with: pip install sentencepiece==0.2.0"
             )
-        
-        try:
-            self.model = SiglipTextModel.from_pretrained(
-                self.model_name, 
-                trust_remote_code=True,
-                torch_dtype=torch.float32
-            ).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name, 
-                trust_remote_code=True
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load SigLIP model {self.model_name}: {str(e)}")
+        self.model = SiglipTextModel.from_pretrained(
+            self.model_name, 
+            trust_remote_code=True,
+            torch_dtype=torch.float32
+        ).to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_name, 
+            trust_remote_code=True
+        )
     
     def encode_text(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True).to(self.device)

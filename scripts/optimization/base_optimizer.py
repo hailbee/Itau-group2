@@ -44,7 +44,7 @@ class BaseOptimizer:
             print(f"Warning: Could not determine embedding dimension for {self.model_type}: {e}")
             # Fallback to default embedding dimension
             self.embedding_dim = 512
-    
+
     def create_model(self, projection_dim=128):
         """
         Create a model with the specified backbone and projection dimension.
@@ -57,9 +57,6 @@ class BaseOptimizer:
         """
         # Create the backbone model wrapper
         backbone = ModelFactory.create_model(self.model_type, self.model_name, self.device)
-        
-        # Create the appropriate siamese model based on the backbone
-        # We'll determine the specific model type based on the training mode
         return backbone
     
     def create_siamese_model(self, mode, projection_dim=128):
@@ -73,18 +70,23 @@ class BaseOptimizer:
         Returns:
             Siamese model instance
         """
-        backbone = self.create_model(projection_dim)
-        
-        if mode == "pair":
-            return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
-        elif mode == "triplet":
-            return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
-        elif mode == "supcon":
-            return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
-        elif mode == "infonce":
-            return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
+        try:
+            backbone = self.create_model(projection_dim)
+            
+            if mode == "pair":
+                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
+            elif mode == "triplet":
+                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
+            elif mode == "supcon":
+                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
+            elif mode == "infonce":
+                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
+            else:
+                raise ValueError(f"Unknown mode: {mode}")
+                
+        except Exception as e:
+            print(f"Error creating siamese model for mode {mode}: {e}")
+            raise RuntimeError(f"Failed to create siamese model for mode {mode}: {str(e)}")
     
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""

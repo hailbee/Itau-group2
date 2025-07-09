@@ -142,41 +142,37 @@ class UnifiedHyperparameterOptimizer:
                 mode="pair", loss_type="cosine", warmup_filepath=None, **kwargs):
         """
         Run hyperparameter optimization using the specified method.
-        
-        Args:
-            method: Optimization method ("bayesian", "random", "optuna", "pbt")
-            reference_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
-            test_filepath: Path to test data
-            mode: Training mode
-            loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
-            **kwargs: Additional arguments for the specific optimization method
-            
-        Returns:
-            Results from the optimization
         """
         print(f"Starting {method} optimization for {self.model_type} model")
         
+        # Filter kwargs for each optimizer
         if method == "bayesian":
+            allowed = ["n_calls", "n_random_starts", "epochs", "warmup_epochs"]
+            filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_bayesian_optimization(
                 reference_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **kwargs
+                mode, loss_type, warmup_filepath, **filtered
             )
         elif method == "random":
+            allowed = ["n_trials", "epochs", "warmup_epochs"]
+            filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_random_optimization(
                 reference_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **kwargs
+                mode, loss_type, warmup_filepath, **filtered
             )
         elif method == "optuna":
+            allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
+            filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_optuna_optimization(
                 reference_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **kwargs
+                mode, loss_type, warmup_filepath, **filtered
             )
         elif method == "pbt":
+            allowed = ["population_size", "generations", "epochs_per_generation", "warmup_epochs", "evolution_frequency"]
+            filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_pbt_optimization(
                 reference_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **kwargs
+                mode, loss_type, warmup_filepath, **filtered
             )
         else:
             raise ValueError(f"Unknown optimization method: {method}")
@@ -217,50 +213,40 @@ class UnifiedHyperparameterOptimizer:
                        mode="pair", loss_type="cosine", warmup_filepath=None, **kwargs):
         """
         Compare different optimization methods on the same problem.
-        
-        Args:
-            reference_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
-            test_filepath: Path to test data
-            mode: Training mode
-            loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
-            **kwargs: Additional arguments for optimization methods
-            
-        Returns:
-            Dictionary with results from all methods
         """
         print(f"Comparing optimization methods for {self.model_type} model")
         print(f"Mode: {mode}, Loss: {loss_type}")
         
         methods = ["random", "bayesian", "optuna", "pbt"]
         results = {}
-        
         for method in methods:
             print(f"\n{'='*50}")
             print(f"Running {method.upper()} optimization")
             print(f"{'='*50}")
-            
             try:
+                # Filter kwargs for each optimizer
+                if method == "bayesian":
+                    allowed = ["n_calls", "n_random_starts", "epochs", "warmup_epochs"]
+                elif method == "random":
+                    allowed = ["n_trials", "epochs", "warmup_epochs"]
+                elif method == "optuna":
+                    allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
+                elif method == "pbt":
+                    allowed = ["population_size", "generations", "epochs_per_generation", "warmup_epochs", "evolution_frequency"]
+                filtered = {k: kwargs[k] for k in allowed if k in kwargs}
                 method_results = self.optimize(
                     method, reference_filepath, test_reference_filepath, test_filepath,
-                    mode, loss_type, warmup_filepath, **kwargs
+                    mode, loss_type, warmup_filepath, **filtered
                 )
                 results[method] = method_results
-                
-                # Extract best results
                 if method_results:
                     best_auc = max(r.get('test_auc', 0) for r in method_results)
                     best_accuracy = max(r.get('test_accuracy', 0) for r in method_results)
                     print(f"{method.upper()} - Best AUC: {best_auc:.4f}, Best Accuracy: {best_accuracy:.4f}")
-                
             except Exception as e:
                 print(f"Error in {method} optimization: {e}")
                 results[method] = []
-        
-        # Save comparison results
         self._save_comparison_results(results, mode, loss_type)
-        
         return results
     
     def _save_comparison_results(self, results, mode, loss_type):
