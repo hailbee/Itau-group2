@@ -97,14 +97,17 @@ class GridSearcher:
             for internal_layer_size in internal_layer_sizes:
                 for lr in lrs:
                     for margin in margins:
-                        # Ensure embedding_dim is an int
+                        # Ensure embedding_dim and projection_dim are ints
                         embedding_dim = self.backbone.embedding_dim
                         if isinstance(embedding_dim, (tuple, list)):
                             embedding_dim = embedding_dim[0]
+                        projection_dim = internal_layer_size
+                        if isinstance(projection_dim, (tuple, list)):
+                            projection_dim = projection_dim[0]
                         # Create model and optimizer
                         model = self.model_class(
                             embedding_dim,
-                            internal_layer_size
+                            projection_dim
                         ).to(self.device)
                         
                         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
