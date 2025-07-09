@@ -301,6 +301,8 @@ class BaseOptimizer:
                 "loss_type": loss_type,
                 "model_type": self.model_type,
                 "model_name": self.model_name,
+                "test_auc": best_metrics.get('roc_auc', 0),
+                "test_accuracy": best_metrics.get('accuracy', 0),
                 **best_metrics
             }
             
@@ -313,15 +315,19 @@ class BaseOptimizer:
             self.results.append(result)
             
             # Update best metrics
-            if best_metrics.get('test_auc', 0) > self.best_auc:
-                self.best_auc = best_metrics['test_auc']
-            if best_metrics.get('test_accuracy', 0) > self.best_accuracy:
-                self.best_accuracy = best_metrics['test_accuracy']
+            if best_metrics.get('roc_auc', 0) > self.best_auc:
+                self.best_auc = best_metrics['roc_auc']
+            if best_metrics.get('accuracy', 0) > self.best_accuracy:
+                self.best_accuracy = best_metrics['accuracy']
             
             return result
             
         except Exception as e:
-            print(f"Trial failed with error: {e}")
+            print(f"\nTrial failed with error: {e}")
+            print(f"Error type: {type(e).__name__}")
+            import traceback
+            print(f"Full traceback:")
+            traceback.print_exc()
             return {
                 "timestamp": datetime.now(),
                 "error": str(e),
