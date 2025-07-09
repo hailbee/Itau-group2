@@ -181,7 +181,9 @@ class OptunaOptimizer(BaseOptimizer):
             df.to_csv(filename, index=False)
             print(f"Results saved to {filename}")
             
-            # Save study
+            # Save study using pickle
+            import pickle
             study_filename = f"{self.log_dir}/optuna_study_{timestamp}.pkl"
-            study.export_artifacts(study_filename)
+            with open(study_filename, 'wb') as f:
+                pickle.dump(study, f)
             print(f"Study saved to {study_filename}")
