@@ -14,19 +14,14 @@ class Evaluator:
         self.batch_size = batch_size
         self.model_type = model_type
         
-        # Check if model is already an embedding extractor
-        if hasattr(model, 'forward') and callable(model.forward):
-            # It's already an embedding extractor
-            self.extractor = model
+        # Create embedding extractor from model based on model type
+        if model_type in ['supcon', 'infonce']:
+            # Use specialized extractor for SupCon and InfoNCE models
+            print("USING SUPCON EMBEDDING EXTRACTOR")
+            self.extractor = SupConEmbeddingExtractor(model)
         else:
-            # Create embedding extractor from model based on model type
-            if model_type in ['supcon', 'infonce']:
-                # Use specialized extractor for SupCon and InfoNCE models
-                print("USING SUPCON EMBEDDING EXTRACTOR")
-                self.extractor = SupConEmbeddingExtractor(model)
-            else:
-                print("FUCKKKKKKK # Use standard extractor for other models (pair, triplet)")
-                self.extractor = EmbeddingExtractor(model)
+            print("FUCKKKKKKK # Use standard extractor for other models (pair, triplet)")
+            self.extractor = EmbeddingExtractor(model)
 
     def compute_similarities(self, reference_names, test_names):
         """Compute similarity matrix between reference and test names"""
