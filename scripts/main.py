@@ -163,14 +163,60 @@ def main():
 
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         
+        # Create dataloaders
+        import pandas as pd
+        from torch.utils.data import DataLoader
+        
+        # Load training data
+        dataframe = pd.read_pickle(args.reference_filepath)
+        
+        # Create appropriate dataset and dataloader based on model type
+        if args.model_type == "pair":
+            from utils.data import TextPairDataset
+            dataset = TextPairDataset(dataframe)
+        elif args.model_type == "triplet":
+            from utils.data import TripletDataset
+            dataset = TripletDataset(dataframe)
+        elif args.model_type == "supcon":
+            from utils.data import SupConDataset
+            dataset = SupConDataset(dataframe)
+        elif args.model_type == "infonce":
+            from utils.data import InfoNCEDataset
+            dataset = InfoNCEDataset(dataframe)
+        else:
+            raise ValueError(f"Unknown model type: {args.model_type}")
+        
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+        
+        # Create warmup dataloader if warmup filepath is provided
+        warmup_loader = None
+        if args.warmup_filepath:
+            warmup_dataframe = pd.read_pickle(args.warmup_filepath)
+            if args.model_type == "pair":
+                from utils.data import TextPairDataset
+                warmup_dataset = TextPairDataset(warmup_dataframe)
+            elif args.model_type == "triplet":
+                from utils.data import TripletDataset
+                warmup_dataset = TripletDataset(warmup_dataframe)
+            elif args.model_type == "supcon":
+                from utils.data import SupConDataset
+                warmup_dataset = SupConDataset(warmup_dataframe)
+            elif args.model_type == "infonce":
+                from utils.data import InfoNCEDataset
+                warmup_dataset = InfoNCEDataset(warmup_dataframe)
+            else:
+                raise ValueError(f"Unknown model type: {args.model_type}")
+            
+            warmup_loader = DataLoader(warmup_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+        
         trainer = Trainer(model, criterion, optimizer, device)
         trainer.train(
-            dataloader=None,  # You'll need to create appropriate dataloader
+            dataloader=dataloader,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
             epochs=args.epochs,
-            warmup_loader=None,  # You'll need to create appropriate dataloader
+            warmup_loader=warmup_loader,
             warmup_epochs=args.warmup_epochs
         )
 
