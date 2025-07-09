@@ -191,6 +191,9 @@ def main():
             if isinstance(projection_dim, (tuple, list)):
                 print(f"[DEBUG] projection_dim before fix: {projection_dim} ({type(projection_dim)})")
                 projection_dim = projection_dim[0]
+            # Always cast to int
+            embedding_dim = int(embedding_dim)
+            projection_dim = int(projection_dim)
             print(f"[DEBUG] model_class_factory after fix: embedding_dim={embedding_dim} ({type(embedding_dim)}), projection_dim={projection_dim} ({type(projection_dim)})")
             return get_siamese_model(args.model_type, args.backbone, embedding_dim=embedding_dim, projection_dim=projection_dim, device=device)
         searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir, backbone=backbone_module)
