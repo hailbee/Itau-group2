@@ -269,14 +269,16 @@ class BaseOptimizer:
                 criterion = loss_class(margin=margin)
             
             # Create trainer and evaluator
+            print(f"[DEBUG] evaluate_trial - mode: {mode}")
             trainer = Trainer(
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
                 device=self.device,
-                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                model_type=mode
             )
-            evaluator = Evaluator(model, batch_size=batch_size)
+            evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)
             
             # Train model
             best_metrics = trainer.train(

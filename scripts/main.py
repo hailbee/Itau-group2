@@ -210,7 +210,7 @@ def main():
             warmup_loader = DataLoader(warmup_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         
         ### here: pass in the model_type
-        trainer = Trainer(model, criterion, optimizer, device, args.model_type)
+        trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
         trainer.train(
             dataloader=dataloader,
             test_reference_filepath=args.test_reference_filepath,
