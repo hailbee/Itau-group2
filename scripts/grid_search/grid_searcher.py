@@ -108,6 +108,14 @@ class GridSearcher:
                         projection_dim = internal_layer_size
                         if isinstance(projection_dim, (tuple, list)):
                             projection_dim = projection_dim[0]
+                        # Ensure all numeric parameters are proper types
+                        embedding_dim = int(embedding_dim)
+                        projection_dim = int(projection_dim)
+                        lr = float(lr)
+                        margin = float(margin)
+                        batch_size = int(batch_size)
+                        internal_layer_size = int(internal_layer_size)
+                        
                         # Create model and optimizer
                         model = self.model_class(
                             embedding_dim,
