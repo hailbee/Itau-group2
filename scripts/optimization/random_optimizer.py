@@ -42,19 +42,24 @@ class RandomOptimizer(BaseOptimizer):
         
         # Evaluate each trial
         for i, params in enumerate(trials):
-            print(f"Evaluating trial {i+1}/{len(trials)}")
+            print(f"\n{'='*50}")
+            print(f"Starting Trial {i+1}")
+            print(f"{'='*50}")
+            
             result = self.evaluate_trial(
                 params, reference_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
-            print(f"Trial {i+1} - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nTrial {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
         
         # Save results
         self._save_results()
         
+        print(f"\n{'='*60}")
         print(f"Random search completed!")
         print(f"Best AUC: {self.best_auc:.4f}")
         print(f"Best Accuracy: {self.best_accuracy:.4f}")
+        print(f"{'='*60}")
         
         return self.results
     

@@ -139,14 +139,18 @@ class PopulationBasedTrainer(BaseOptimizer):
         
         # Training loop with evolution
         for generation in range(generations):
-            print(f"\nGeneration {generation + 1}/{generations}")
+            print(f"\n{'='*60}")
+            print(f"Generation {generation + 1}/{generations}")
+            print(f"{'='*60}")
             
             # Train each member of the population
             generation_results = []
             for i, (model, optimizer, trainer, dataloader, warmup_loader) in enumerate(
                 zip(models, optimizers, trainers, dataloaders, warmup_loaders)):
                 
-                print(f"Training population member {i+1}/{len(population)}")
+                print(f"\n{'='*50}")
+                print(f"Training Population Member {i+1}/{len(population)}")
+                print(f"{'='*50}")
                 
                 # Log parameters for this population member
                 params = population[i]
@@ -204,19 +208,21 @@ class PopulationBasedTrainer(BaseOptimizer):
                 if best_metrics.get('test_accuracy', 0) > self.best_accuracy:
                     self.best_accuracy = best_metrics['test_accuracy']
                 
-                print(f"Member {i+1} - AUC: {best_metrics.get('test_auc', 0):.4f}, Accuracy: {best_metrics.get('test_accuracy', 0):.4f}")
+                print(f"\nMember {i+1} completed - AUC: {best_metrics.get('test_auc', 0):.4f}, Accuracy: {best_metrics.get('test_accuracy', 0):.4f}")
             
             # Evolve population if needed
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:
-                print(f"Evolving population at generation {generation + 1}")
+                print(f"\nEvolving population at generation {generation + 1}")
                 self._evolve_population(models, population, generation_results, mode)
         
         # Save results
         self._save_results()
         
+        print(f"\n{'='*60}")
         print(f"PBT completed!")
         print(f"Best AUC: {self.best_auc:.4f}")
         print(f"Best Accuracy: {self.best_accuracy:.4f}")
+        print(f"{'='*60}")
         
         return self.results
     

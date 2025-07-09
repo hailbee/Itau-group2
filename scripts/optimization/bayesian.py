@@ -45,16 +45,21 @@ class BayesianOptimizer(BaseOptimizer):
         
         # Evaluate initial samples
         for i, params in enumerate(initial_samples):
-            print(f"Evaluating initial sample {i+1}/{len(initial_samples)}")
+            print(f"\n{'='*50}")
+            print(f"Starting Initial Sample {i+1}")
+            print(f"{'='*50}")
+            
             result = self.evaluate_trial(
                 params, reference_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
-            print(f"Sample {i+1} - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nInitial Sample {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
         
         # Bayesian optimization loop
         for i in range(n_calls - n_random_starts):
-            print(f"Bayesian optimization iteration {i+1}/{n_calls - n_random_starts}")
+            print(f"\n{'='*50}")
+            print(f"Starting Bayesian Iteration {i+1}")
+            print(f"{'='*50}")
             
             # Sample next point using acquisition function
             next_params = self._sample_next_point(mode)
@@ -64,14 +69,16 @@ class BayesianOptimizer(BaseOptimizer):
                 next_params, reference_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
-            print(f"Iteration {i+1} - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nBayesian Iteration {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
         
         # Save results
         self._save_results()
         
+        print(f"\n{'='*60}")
         print(f"Bayesian optimization completed!")
         print(f"Best AUC: {self.best_auc:.4f}")
         print(f"Best Accuracy: {self.best_accuracy:.4f}")
+        print(f"{'='*60}")
         
         return self.results
     
