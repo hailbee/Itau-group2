@@ -26,11 +26,17 @@ class Trainer:
         epoch_loss = 0.0
         
         for i, batch in enumerate(dataloader):
-            # Unified logic: model and criterion handle all modes
+            # Handle different modes based on expected inputs
             if mode == "triplet":
                 anchor_texts, positive_texts, negative_texts = batch
                 outputs = self.model(anchor_texts, positive_texts, negative_texts)
-            else:
+            elif mode == "supcon":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            elif mode == "infonce":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            else:  # pair mode
                 outputs = self.model(*batch)
             loss = self.criterion(*outputs)
 
