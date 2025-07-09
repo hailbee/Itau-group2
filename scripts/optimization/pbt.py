@@ -6,9 +6,12 @@ import copy
 import os
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
-from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
-from model_utils.models.supcon import SiameseCLIPSupCon
-from model_utils.models.infonce import SiameseCLIPInfoNCE
+from model_utils.models.learning import (
+    SiameseModelPairs, 
+    SiameseModelTriplet,
+    SiameseModelSupCon,
+    SiameseModelInfoNCE
+)
 
 class PopulationBasedTrainer:
     """
@@ -77,8 +80,8 @@ class PopulationBasedTrainer:
 
         from torch.utils.data import DataLoader
         # Use num_workers=0 for pair mode to avoid device mismatch issues
-        # num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+        num_workers = 0 if mode == "pair" else 4
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     def sample_initial_hyperparameters(self, mode, population_size):
         """

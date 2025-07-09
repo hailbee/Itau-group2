@@ -3,9 +3,12 @@ import pandas as pd
 from datetime import datetime
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
-from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
-from model_utils.models.supcon import SiameseCLIPSupCon
-from model_utils.models.infonce import SiameseCLIPInfoNCE
+from model_utils.models.learning import (
+    SiameseModelPairs, 
+    SiameseModelTriplet,
+    SiameseModelSupCon,
+    SiameseModelInfoNCE
+)
 
 class GridSearcher:
     """

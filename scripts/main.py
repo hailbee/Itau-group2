@@ -6,9 +6,12 @@ from scripts.evaluation.evaluator import Evaluator
 from scripts.grid_search.grid_searcher import GridSearcher
 from scripts.baseline.baseline_tester import BaselineTester
 from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
-from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
-from model_utils.models.supcon import SiameseCLIPSupCon
-from model_utils.models.infonce import SiameseCLIPInfoNCE
+from model_utils.models.learning import (
+    SiameseModelPairs, 
+    SiameseModelTriplet,
+    SiameseModelSupCon,
+    SiameseModelInfoNCE
+)
 
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
@@ -88,17 +91,13 @@ def main():
         print(f"[DEBUG] backbone_module type: {type(backbone_module)}")
         assert hasattr(backbone_module, 'encode_text'), f"Backbone {type(backbone_module)} does not have encode_text"
         if mode == 'pair':
-            from model_utils.models.siamese import SiameseCLIPModelPairs
-            return SiameseCLIPModelPairs(embedding_dim, projection_dim, backbone=backbone_module)
+            return SiameseModelPairs(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'triplet':
-            from model_utils.models.siamese import SiameseCLIPTriplet
-            return SiameseCLIPTriplet(embedding_dim, projection_dim, backbone=backbone_module)
+            return SiameseModelTriplet(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'supcon':
-            from model_utils.models.supcon import SiameseCLIPSupCon
-            return SiameseCLIPSupCon(embedding_dim, projection_dim, backbone=backbone_module)
+            return SiameseModelSupCon(embedding_dim, projection_dim, backbone=backbone_module)
         elif mode == 'infonce':
-            from model_utils.models.infonce import SiameseCLIPInfoNCE
-            return SiameseCLIPInfoNCE(embedding_dim, projection_dim, backbone=backbone_module)
+            return SiameseModelInfoNCE(embedding_dim, projection_dim, backbone=backbone_module)
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
@@ -215,13 +214,13 @@ def main():
     elif args.mode in ['bayesian', 'random', 'optuna', 'pbt']:
         # Advanced hyperparameter optimization
         if args.model_type == 'pair':
-            model_class = SiameseCLIPModelPairs
+            model_class = SiameseModelPairs
         elif args.model_type == 'triplet':
-            model_class = SiameseCLIPTriplet
+            model_class = SiameseModelTriplet
         elif args.model_type == 'supcon':
-            model_class = SiameseCLIPSupCon
+            model_class = SiameseModelSupCon
         else:  # infonce
-            model_class = SiameseCLIPInfoNCE
+            model_class = SiameseModelInfoNCE
         
         optimizer = UnifiedHyperparameterOptimizer(model_class, device, log_dir=args.log_dir)
         
@@ -260,13 +259,13 @@ def main():
     elif args.mode == 'compare':
         # Compare different optimization methods
         if args.model_type == 'pair':
-            model_class = SiameseCLIPModelPairs
+            model_class = SiameseModelPairs
         elif args.model_type == 'triplet':
-            model_class = SiameseCLIPTriplet
+            model_class = SiameseModelTriplet
         elif args.model_type == 'supcon':
-            model_class = SiameseCLIPSupCon
+            model_class = SiameseModelSupCon
         else:  # infonce
-            model_class = SiameseCLIPInfoNCE
+            model_class = SiameseModelInfoNCE
         
         optimizer = UnifiedHyperparameterOptimizer(model_class, device, log_dir=args.log_dir)
         

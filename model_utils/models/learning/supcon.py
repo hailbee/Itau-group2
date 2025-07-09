@@ -1,15 +1,16 @@
-from .base import BaseSiameseCLIP
+from ..base import BaseSiameseModel
 from utils.data import SupConDataset
 from torch.utils.data import DataLoader
 import torch
 
-class SiameseCLIPSupCon(BaseSiameseCLIP):
+class SiameseModelSupCon(BaseSiameseModel):
     """
-    Siamese network for SupCon learning using CLIP as backbone.
+    Siamese network for SupCon learning using any vision-language model as backbone.
     Handles multiple positive and negative examples per anchor.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
-        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
+        super().__init__(embedding_dim, projection_dim, backbone)
+    
     def forward(self, anchor_text, positive_texts, negative_texts):
         """
         Forward pass for SupCon learning (batched).

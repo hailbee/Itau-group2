@@ -1,11 +1,12 @@
-from .base import BaseSiameseCLIP
+from ..base import BaseSiameseModel
 
-class SiameseCLIPModelPairs(BaseSiameseCLIP):
+class SiameseModelPairs(BaseSiameseModel):
     """
-    Siamese network for pair-wise learning using CLIP as backbone.
+    Siamese network for pair-wise learning using any vision-language model as backbone.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
-        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
+        super().__init__(embedding_dim, projection_dim, backbone)
+    
     def forward(self, text1, text2, label=None):
         z1 = self.encode(text1)
         z2 = self.encode(text2)
@@ -14,12 +15,13 @@ class SiameseCLIPModelPairs(BaseSiameseCLIP):
             label = label.to(z1.device)
         return z1, z2, label
 
-class SiameseCLIPTriplet(BaseSiameseCLIP):
+class SiameseModelTriplet(BaseSiameseModel):
     """
-    Siamese network for triplet learning using CLIP as backbone.
+    Siamese network for triplet learning using any vision-language model as backbone.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
-        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
+        super().__init__(embedding_dim, projection_dim, backbone)
+    
     def forward(self, anchor_texts, positive_texts=None, negative_texts=None):
         z_anchor = self.encode(anchor_texts)
         if positive_texts is None and negative_texts is None:

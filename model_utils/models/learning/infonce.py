@@ -1,15 +1,16 @@
-from .base import BaseSiameseCLIP
+from ..base import BaseSiameseModel
 from utils.data import InfoNCEDataset
 from torch.utils.data import DataLoader
 import torch
 
-class SiameseCLIPInfoNCE(BaseSiameseCLIP):
+class SiameseModelInfoNCE(BaseSiameseModel):
     """
-    Siamese network for InfoNCE learning using CLIP as backbone.
+    Siamese network for InfoNCE learning using any vision-language model as backbone.
     Handles one positive and multiple negative examples per anchor.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, freeze_clip=True, backbone=None, tokenizer=None):
-        super().__init__(embedding_dim, projection_dim, freeze_clip, backbone, tokenizer)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
+        super().__init__(embedding_dim, projection_dim, backbone)
+    
     def forward(self, anchor_text, positive_text, negative_texts):
         """
         Forward pass for InfoNCE learning (batched).
