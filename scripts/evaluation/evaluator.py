@@ -13,6 +13,7 @@ class Evaluator:
         self.model = model
         self.batch_size = batch_size
         # Check if model is already an embedding extractor
+        #### determine the embedding 
         if hasattr(model, 'forward') and callable(model.forward):
             # It's already an embedding extractor
             print("WE ARE HERE")
@@ -21,6 +22,7 @@ class Evaluator:
             # Create embedding extractor from model based on model type
             if hasattr(model, '__class__') and ('SupCon' in model.__class__.__name__ or 'InfoNCE' in model.__class__.__name__):
                 # Use specialized extractor for SupCon and InfoNCE models
+                print("Sup Con embedding Extractor gets used")
                 self.extractor = SupConEmbeddingExtractor(model)
             else:
                 # Use standard extractor for other models

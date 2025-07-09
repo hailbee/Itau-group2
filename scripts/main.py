@@ -209,6 +209,7 @@ def main():
             
             warmup_loader = DataLoader(warmup_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         
+        ### here: pass in the model_type
         trainer = Trainer(model, criterion, optimizer, device)
         trainer.train(
             dataloader=dataloader,

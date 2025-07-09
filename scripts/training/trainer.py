@@ -18,6 +18,7 @@ class Trainer:
         self.device = device
         self.log_csv_path = log_csv_path
         self.model.to(device)
+        ### use model_type to select the evaluator
         self.evaluator = Evaluator(model)
 
     def train_epoch(self, dataloader, mode="pair"):
