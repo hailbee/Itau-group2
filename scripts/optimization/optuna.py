@@ -10,6 +10,9 @@ from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
 from .base_optimizer import BaseOptimizer
 
+# Suppress Optuna's internal logging
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 class OptunaOptimizer(BaseOptimizer):
     """
     Optuna-based hyperparameter optimization with multiple samplers and pruning.
