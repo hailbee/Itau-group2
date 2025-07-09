@@ -15,6 +15,7 @@ class Evaluator:
         # Check if model is already an embedding extractor
         if hasattr(model, 'forward') and callable(model.forward):
             # It's already an embedding extractor
+            print("WE ARE HERE")
             self.extractor = model
         else:
             # Create embedding extractor from model based on model type
