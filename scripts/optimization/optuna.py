@@ -71,6 +71,11 @@ class OptunaOptimizer(BaseOptimizer):
             params['margin'] = margin
         
         try:
+            # Print trial separator
+            print(f"\n{'='*50}")
+            print(f"Starting Trial {trial.number}")
+            print(f"{'='*50}")
+            
             # Use the base class evaluate_trial method
             result = self.evaluate_trial(
                 params, reference_filepath, test_reference_filepath, test_filepath,
@@ -80,10 +85,13 @@ class OptunaOptimizer(BaseOptimizer):
             # Add trial number to result
             result["trial_number"] = trial.number
             
+            # Print trial result with better spacing
+            print(f"\nTrial {trial.number} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            
             return result.get('test_accuracy', 0.0)
             
         except Exception as e:
-            print(f"Trial {trial.number} failed with error: {e}")
+            print(f"\nTrial {trial.number} failed with error: {e}")
             return 0.0
     
     def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
@@ -164,11 +172,13 @@ class OptunaOptimizer(BaseOptimizer):
             best_auc = 0
             best_accuracy = 0
         
+        print(f"\n{'='*60}")
         print(f"Optuna optimization completed!")
         print(f"Best AUC: {best_auc:.4f}")
         print(f"Best Accuracy: {best_accuracy:.4f}")
         print(f"Best trial: {study.best_trial.number}")
         print(f"Best parameters: {study.best_params}")
+        print(f"{'='*60}")
         
         return self.results
     
