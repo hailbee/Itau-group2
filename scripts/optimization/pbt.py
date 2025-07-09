@@ -204,12 +204,12 @@ class PopulationBasedTrainer(BaseOptimizer):
                 self.results.append(result)
                 
                 # Update best metrics
-                if best_metrics.get('test_auc', 0) > self.best_auc:
-                    self.best_auc = best_metrics['test_auc']
-                if best_metrics.get('test_accuracy', 0) > self.best_accuracy:
-                    self.best_accuracy = best_metrics['test_accuracy']
+                if best_metrics.get('roc_auc', 0) > self.best_auc:
+                    self.best_auc = best_metrics['roc_auc']
+                if best_metrics.get('accuracy', 0) > self.best_accuracy:
+                    self.best_accuracy = best_metrics['accuracy']
                 
-                print(f"\nMember {i+1} completed - AUC: {best_metrics.get('test_auc', 0):.4f}, Accuracy: {best_metrics.get('test_accuracy', 0):.4f}")
+                print(f"\nMember {i+1} completed - AUC: {best_metrics.get('roc_auc', 0):.4f}, Accuracy: {best_metrics.get('accuracy', 0):.4f}")
             
             # Evolve population if needed
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:
@@ -240,7 +240,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         # Sort by performance (AUC)
         sorted_indices = sorted(
             range(len(generation_results)),
-            key=lambda i: generation_results[i].get('test_auc', 0),
+            key=lambda i: generation_results[i].get('roc_auc', 0),
             reverse=True
         )
         
