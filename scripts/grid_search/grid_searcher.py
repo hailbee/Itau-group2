@@ -138,9 +138,10 @@ class GridSearcher:
                             criterion=criterion,
                             optimizer=optimizer,
                             device=self.device,
-                            log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                            log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            model_type=mode
                         )
-                        evaluator = Evaluator(model, batch_size=batch_size)
+                        evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)
 
                         print(f"\n--- Training config: lr={lr}, bs={batch_size}, "
                               f"{'temperature' if mode in ['supcon', 'infonce'] else 'margin'}={temperature if mode in ['supcon', 'infonce'] else margin}, "

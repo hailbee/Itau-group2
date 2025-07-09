@@ -11,15 +11,15 @@ class Trainer:
     Unified training interface for both pair and triplet models.
     Handles training, validation, and logging.
     """
-    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv"):
+    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv", model_type=None):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
         self.log_csv_path = log_csv_path
+        self.model_type = model_type
         self.model.to(device)
-        ### use model_type to select the evaluator
-        self.evaluator = Evaluator(model)
+        self.evaluator = Evaluator(model, model_type=model_type)
 
     def train_epoch(self, dataloader, mode="pair"):
         """Train for one epoch"""

@@ -129,12 +129,13 @@ class PopulationBasedTrainer(BaseOptimizer):
                 criterion=None,  # Will be set during training
                 optimizer=optimizer,
                 device=self.device,
-                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                model_type=mode
             )
             trainers.append(trainer)
             
             # Create evaluator
-            evaluator = Evaluator(model, batch_size=batch_size)
+            evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)
             evaluators.append(evaluator)
         
         # Training loop with evolution

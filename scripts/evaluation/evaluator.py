@@ -9,23 +9,23 @@ class Evaluator:
     """
     Unified evaluation interface for model testing and metrics computation.
     """
-    def __init__(self, model, batch_size=32):
+    def __init__(self, model, batch_size=32, model_type=None):
         self.model = model
         self.batch_size = batch_size
+        self.model_type = model_type
+        
         # Check if model is already an embedding extractor
-        #### determine the embedding 
         if hasattr(model, 'forward') and callable(model.forward):
             # It's already an embedding extractor
-            print("WE ARE HERE")
             self.extractor = model
         else:
             # Create embedding extractor from model based on model type
-            if hasattr(model, '__class__') and ('SupCon' in model.__class__.__name__ or 'InfoNCE' in model.__class__.__name__):
+            if model_type in ['supcon', 'infonce']:
                 # Use specialized extractor for SupCon and InfoNCE models
-                print("Sup Con embedding Extractor gets used")
+                print("USING SUPCON EMBEDDING EXTRACTOR")
                 self.extractor = SupConEmbeddingExtractor(model)
             else:
-                # Use standard extractor for other models
+                print("FUCKKKKKKK # Use standard extractor for other models (pair, triplet)")
                 self.extractor = EmbeddingExtractor(model)
 
     def compute_similarities(self, reference_names, test_names):
