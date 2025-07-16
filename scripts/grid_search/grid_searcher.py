@@ -3,18 +3,26 @@ import pandas as pd
 from datetime import datetime
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
-from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
-from model_utils.models.supcon import SiameseCLIPSupCon
-from model_utils.models.infonce import SiameseCLIPInfoNCE
+from model_utils.models.learning import (
+    SiameseModelPairs, 
+    SiameseModelTriplet,
+    SiameseModelSupCon,
+    SiameseModelInfoNCE
+)
 
 class GridSearcher:
     """
     Unified grid search interface for hyperparameter optimization.
     """
-    def __init__(self, model_class, device, log_dir="grid_search_results"):
+    def __init__(self, model_class, device, log_dir="grid_search_results", backbone=None):
+        import os
         self.model_class = model_class
         self.device = device
         self.log_dir = log_dir
+        self.backbone = backbone
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(self.log_dir, exist_ok=True)
 
     def get_loss_class(self, mode, loss_type):
         """Get appropriate loss class based on mode and type"""
@@ -47,15 +55,15 @@ class GridSearcher:
             return InfoNCELoss
         raise ValueError(f"Unsupported mode/loss_type combination: {mode}/{loss_type}")
 
-    def search(self, reference_filepath, test_reference_filepath, test_filepath,
+    def search(self, training_filepath, test_reference_filepath, test_filepath,
               lrs, batch_sizes, margins, internal_layer_sizes,
               mode="pair", loss_type="cosine", warmup_filepath=None,
-              epochs=5, warmup_epochs=5, curriculum = None, temperature=0.07):
+              epochs=5, warmup_epochs=5, temperature=0.07):
         """
         Perform grid search over hyperparameters.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             lrs: List of learning rates to try
@@ -76,9 +84,9 @@ class GridSearcher:
         best_config = {}
 
         # Load data
-        dataframe = pd.read_pickle(reference_filepath)
+        dataframe = pd.read_parquet(training_filepath)
         if warmup_filepath:
-            warmup_dataframe = pd.read_pickle(warmup_filepath)
+            warmup_dataframe = pd.read_parquet(warmup_filepath)
 
         # Get loss class
         loss_class = self.get_loss_class(mode, loss_type)
@@ -93,10 +101,25 @@ class GridSearcher:
             for internal_layer_size in internal_layer_sizes:
                 for lr in lrs:
                     for margin in margins:
+                        # Ensure embedding_dim and projection_dim are ints
+                        embedding_dim = self.backbone.embedding_dim
+                        if isinstance(embedding_dim, (tuple, list)):
+                            embedding_dim = embedding_dim[0]
+                        projection_dim = internal_layer_size
+                        if isinstance(projection_dim, (tuple, list)):
+                            projection_dim = projection_dim[0]
+                        # Ensure all numeric parameters are proper types
+                        embedding_dim = int(embedding_dim)
+                        projection_dim = int(projection_dim)
+                        lr = float(lr)
+                        margin = float(margin)
+                        batch_size = int(batch_size)
+                        internal_layer_size = int(internal_layer_size)
+                        
                         # Create model and optimizer
                         model = self.model_class(
-                            embedding_dim=512,
-                            projection_dim=internal_layer_size
+                            embedding_dim,
+                            projection_dim
                         ).to(self.device)
                         
                         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -115,25 +138,28 @@ class GridSearcher:
                             criterion=criterion,
                             optimizer=optimizer,
                             device=self.device,
-                            log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                            log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            model_type=mode
                         )
-                        evaluator = Evaluator(model, batch_size=batch_size)
+                        evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)
 
                         print(f"\n--- Training config: lr={lr}, bs={batch_size}, "
                               f"{'temperature' if mode in ['supcon', 'infonce'] else 'margin'}={temperature if mode in ['supcon', 'infonce'] else margin}, "
                               f"size={internal_layer_size}, loss={loss_type} ---")
 
                         # Train model
-                        best_metrics = trainer.train(
+                        train_kwargs = dict(
                             dataloader=dataloader,
                             test_reference_filepath=test_reference_filepath,
                             test_filepath=test_filepath,
                             mode=mode,
                             epochs=epochs,
                             warmup_loader=warmup_loader,
-                            warmup_epochs=warmup_epochs,
-                            curriculum=curriculum
+                            warmup_epochs=warmup_epochs
                         )
+                        if hasattr(self, 'curriculum') and self.curriculum is not None:
+                            train_kwargs['curriculum'] = self.curriculum
+                        best_metrics = trainer.train(**train_kwargs)
 
                         # Track best results
                         if best_metrics.get('loss', float('inf')) < best_loss:
@@ -220,5 +246,5 @@ class GridSearcher:
 
         from torch.utils.data import DataLoader
         # Use num_workers=0 for pair mode to avoid device mismatch issues
-        # num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4) 
+        num_workers = 0 if mode == "pair" else 4
+        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers) 

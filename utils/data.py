@@ -5,8 +5,16 @@ import ast
 
 class TextPairDataset(Dataset):
     def __init__(self, dataframe):
-        self.name1 = dataframe['name1'].tolist()
-        self.name2 = dataframe['name2'].tolist()
+        # Handle both old format (name1, name2, label) and new format (fraudulent_name, real_name, label)
+        if 'fraudulent_name' in dataframe.columns and 'real_name' in dataframe.columns:
+            self.name1 = dataframe['fraudulent_name'].tolist()
+            self.name2 = dataframe['real_name'].tolist()
+        elif 'name1' in dataframe.columns and 'name2' in dataframe.columns:
+            self.name1 = dataframe['name1'].tolist()
+            self.name2 = dataframe['name2'].tolist()
+        else:
+            raise ValueError("DataFrame must have either (fraudulent_name, real_name) or (name1, name2) columns")
+        
         self.label = dataframe['label'].tolist()
 
     def __len__(self):

@@ -8,88 +8,28 @@ from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
 from optuna.pruners import MedianPruner, HyperbandPruner
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
-from model_utils.models.siamese import SiameseCLIPModelPairs, SiameseCLIPTriplet
-from model_utils.models.supcon import SiameseCLIPSupCon
-from model_utils.models.infonce import SiameseCLIPInfoNCE
+from .base_optimizer import BaseOptimizer
 
-class OptunaOptimizer:
+# Suppress Optuna's internal logging
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+class OptunaOptimizer(BaseOptimizer):
     """
     Optuna-based hyperparameter optimization with multiple samplers and pruning.
     Provides advanced optimization algorithms and visualization capabilities.
     """
     
-    def __init__(self, model_class, device, log_dir="optuna_optimization_results"):
-        self.model_class = model_class
-        self.device = device
-        self.log_dir = log_dir
-        self.results = []
-        self.best_auc = 0.0  # Track best AUC across all trials
-        self.best_accuracy = 0.0  # Track best accuracy across all trials
+    def __init__(self, model_type, model_name=None, device=None, log_dir="optuna_optimization_results"):
+        super().__init__(model_type, model_name, device, log_dir)
         
-        # Create log directory if it doesn't exist
-        os.makedirs(self.log_dir, exist_ok=True)
-        
-    def get_loss_class(self, mode, loss_type):
-        """Get appropriate loss class based on mode and type"""
-        if mode == "pair":
-            if loss_type == "cosine":
-                from model_utils.loss.pair_losses import CosineLoss
-                return CosineLoss
-            elif loss_type == "euclidean":
-                from model_utils.loss.pair_losses import EuclideanLoss
-                return EuclideanLoss
-        elif mode == "triplet":
-            if loss_type == "cosine":
-                from model_utils.loss.triplet_losses import CosineTripletLoss
-                return CosineTripletLoss
-            elif loss_type == "euclidean":
-                from model_utils.loss.triplet_losses import EuclideanTripletLoss
-                return EuclideanTripletLoss
-            elif loss_type == "hybrid":
-                from model_utils.loss.triplet_losses import HybridTripletLoss
-                return HybridTripletLoss
-        elif mode == "supcon":
-            if loss_type == "supcon":
-                from model_utils.loss.supcon_loss import SupConLoss
-                return SupConLoss
-            elif loss_type == "infonce":
-                from model_utils.loss.infonce_loss import InfoNCELoss
-                return InfoNCELoss
-        elif mode == "infonce":
-            from model_utils.loss.infonce_loss import InfoNCELoss
-            return InfoNCELoss
-        raise ValueError(f"Unsupported mode/loss_type combination: {mode}/{loss_type}")
-    
-    def create_dataloader(self, dataframe, batch_size, mode):
-        """Create appropriate dataloader based on mode"""
-        if mode == "pair":
-            from utils.data import TextPairDataset
-            dataset = TextPairDataset(dataframe)
-        elif mode == "triplet":
-            from utils.data import TripletDataset
-            dataset = TripletDataset(dataframe)
-        elif mode == "supcon":
-            from utils.data import SupConDataset
-            dataset = SupConDataset(dataframe)
-        elif mode == "infonce":
-            from utils.data import InfoNCEDataset
-            dataset = InfoNCEDataset(dataframe)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
-
-        from torch.utils.data import DataLoader
-        # Use num_workers=0 for pair mode to avoid device mismatch issues
-        # num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-    
-    def objective(self, trial, reference_filepath, test_reference_filepath, test_filepath,
+    def objective(self, trial, training_filepath, test_reference_filepath, test_filepath,
                  mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5):
         """
         Objective function for Optuna optimization.
         
         Args:
             trial: Optuna trial object
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -119,136 +59,75 @@ class OptunaOptimizer:
         # Optional: suggest weight decay
         weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
         
+        # Create parameter dictionary
+        params = {
+            'lr': lr,
+            'batch_size': batch_size,
+            'internal_layer_size': internal_layer_size,
+            'optimizer': optimizer_name,
+            'weight_decay': weight_decay
+        }
+        
+        if mode in ["supcon", "infonce"]:
+            params['temperature'] = temperature
+        else:
+            params['margin'] = margin
+        
         try:
-            # Load data
-            dataframe = pd.read_pickle(reference_filepath)
-            warmup_dataframe = None
-            if warmup_filepath:
-                warmup_dataframe = pd.read_pickle(warmup_filepath)
+            # Print trial separator
+            print(f"\n{'='*50}")
+            print(f"Starting Trial {trial.number + 1}")
+            print(f"{'='*50}")
             
-            # Create dataloaders
-            dataloader = self.create_dataloader(dataframe, batch_size, mode)
-            warmup_loader = None
-            if warmup_dataframe is not None:
-                warmup_loader = self.create_dataloader(warmup_dataframe, batch_size, mode)
-            
-            # Create model
-            model = self.model_class(
-                embedding_dim=512,
-                projection_dim=internal_layer_size
-            ).to(self.device)
-            
-            # Create optimizer
-            if optimizer_name == "adam":
-                optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-            elif optimizer_name == "adamw":
-                optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-            else:  # sgd
-                optimizer = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=weight_decay)
-            
-            # Get loss class and create criterion
-            loss_class = self.get_loss_class(mode, loss_type)
-            if mode in ["supcon", "infonce"]:
-                criterion = loss_class(temperature=temperature)
-            elif mode == "triplet" and loss_type == "hybrid":
-                criterion = loss_class(margin=margin, alpha=0.5)
-            else:
-                criterion = loss_class(margin=margin)
-            
-            # Create trainer and evaluator
-            trainer = Trainer(
-                model=model,
-                criterion=criterion,
-                optimizer=optimizer,
-                device=self.device,
-                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            )
-            evaluator = Evaluator(model, batch_size=batch_size)
-            
-            # Train model
-            best_metrics = trainer.train(
-                dataloader=dataloader,
-                test_reference_filepath=test_reference_filepath,
-                test_filepath=test_filepath,
-                mode=mode,
-                epochs=epochs,
-                warmup_loader=warmup_loader,
-                warmup_epochs=warmup_epochs
+            # Use the base class evaluate_trial method
+            result = self.evaluate_trial(
+                params, training_filepath, test_reference_filepath, test_filepath,
+                mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
-            # Log results
-            result = {
-                "trial_number": trial.number,
-                "timestamp": datetime.now(),
-                "lr": lr,
-                "batch_size": batch_size,
-                "internal_layer_size": internal_layer_size,
-                "optimizer": optimizer_name,
-                "weight_decay": weight_decay,
-                "epochs": epochs,
-                "train_loss": best_metrics.get('loss', 0.0),  # Use loss from best metrics if available
-                "test_accuracy": best_metrics['accuracy'],
-                "test_auc": best_metrics['roc_auc'],
-                "threshold": best_metrics.get('threshold', 0.5),  # Default threshold
-                "loss_type": loss_type,
-                **{k: v for k, v in locals().items() if k in ['temperature', 'margin'] and v is not None}
-            }
-            self.results.append(result)
+            # Add trial number to result
+            result["trial_number"] = trial.number + 1
             
-            # Track best AUC
-            current_auc = best_metrics['roc_auc']
-            if current_auc > self.best_auc:
-                self.best_auc = current_auc
-                print(f"Trial {trial.number}: New best AUC = {self.best_auc:.4f}")
-            else:
-                print(f"Trial {trial.number}: AUC = {current_auc:.4f} (Best = {self.best_auc:.4f})")
+            # Print trial result with better spacing
+            print(f"\nTrial {trial.number + 1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
             
-            # Track best accuracy
-            current_accuracy = best_metrics['accuracy']
-            if current_accuracy > self.best_accuracy:
-                self.best_accuracy = current_accuracy
-                print(f"Trial {trial.number}: New best accuracy = {self.best_accuracy:.4f}")
-            else:
-                print(f"Trial {trial.number}: Accuracy = {current_accuracy:.4f} (Best = {self.best_accuracy:.4f})")
-            
-            # Report intermediate value for pruning
-            trial.report(best_metrics['accuracy'], epochs)
-            
-            return best_metrics['accuracy']
+            return result.get('test_accuracy', 0.0)
             
         except Exception as e:
-            print(f"Error in trial {trial.number}: {e}")
+            print(f"\nTrial {trial.number + 1} failed with error: {e}")
             return 0.0
     
-    def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50, sampler="tpe", 
                 pruner="median", study_name=None):
         """
-        Perform Optuna-based hyperparameter optimization.
+        Run Optuna optimization.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
-            mode: "pair", "triplet", "supcon", or "infonce"
-            loss_type: Type of loss function to use
-            warmup_filepath: Optional path to warmup data
-            epochs: Number of training epochs
+            mode: Training mode
+            loss_type: Loss function type
+            warmup_filepath: Optional warmup data path
+            epochs: Number of training epochs per trial
             warmup_epochs: Number of warmup epochs
-            n_trials: Number of optimization trials
+            n_trials: Number of trials
             sampler: Sampler type ("tpe", "random", "cmaes")
-            pruner: Pruner type ("median", "hyperband", None)
-            study_name: Name for the study (for storage)
+            pruner: Pruner type ("median", "hyperband")
+            study_name: Name for the study
         """
-        print(f"Starting Optuna optimization for {mode} mode with {loss_type} loss")
-        print(f"Sampler: {sampler}, Pruner: {pruner}, Trials: {n_trials}")
+        print(f"Starting Optuna optimization for {self.model_type} model")
+        print(f"Mode: {mode}, Loss: {loss_type}")
+        print(f"Sampler: {sampler}, Pruner: {pruner}")
+        print(f"Will run {n_trials} trials")
         
-        # Create study name
+        # Create study name if not provided
         if study_name is None:
-            study_name = f"{mode}_{loss_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            study_name = f"{self.model_type}_{mode}_{loss_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # Set up sampler
+        # Choose sampler
         if sampler == "tpe":
             sampler_obj = TPESampler(seed=42)
         elif sampler == "random":
@@ -258,13 +137,11 @@ class OptunaOptimizer:
         else:
             raise ValueError(f"Unknown sampler: {sampler}")
         
-        # Set up pruner
+        # Choose pruner
         if pruner == "median":
-            pruner_obj = MedianPruner(n_startup_trials=5, n_warmup_steps=1)
+            pruner_obj = MedianPruner(n_startup_trials=5, n_warmup_steps=10)
         elif pruner == "hyperband":
-            pruner_obj = HyperbandPruner()
-        elif pruner is None:
-            pruner_obj = None
+            pruner_obj = HyperbandPruner(min_resource=1, max_resource=epochs)
         else:
             raise ValueError(f"Unknown pruner: {pruner}")
         
@@ -273,101 +150,53 @@ class OptunaOptimizer:
             direction="maximize",
             sampler=sampler_obj,
             pruner=pruner_obj,
-            study_name=study_name,
-            storage=None  # Use in-memory storage instead of SQLite
+            study_name=study_name
         )
         
-        # Create objective function with fixed parameters
+        # Define objective wrapper
         def objective_wrapper(trial):
             return self.objective(
-                trial, reference_filepath, test_reference_filepath, test_filepath,
+                trial, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
         
         # Run optimization
         study.optimize(objective_wrapper, n_trials=n_trials)
         
-        # Get best results
-        best_trial = study.best_trial
-        best_params = best_trial.params
-        best_accuracy = best_trial.value
-        
-        print(f"\nOptimization completed!")
-        print(f"Best accuracy: {best_accuracy:.4f}")
-        print(f"Best parameters: {best_params}")
-        
         # Save results
-        results_df = pd.DataFrame(self.results)
-        results_df.to_csv(f"{self.log_dir}/optuna_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                         index=False)
+        self._save_results(study)
         
-        # Print best AUC
-        if not results_df.empty and 'test_auc' in results_df.columns:
-            best_auc = results_df['test_auc'].max()
-            best_auc_row = results_df.loc[results_df['test_auc'].idxmax()]
-            print(f"Best AUC: {best_auc:.4f}")
-            print(f"Best AUC parameters: {best_auc_row.to_dict()}")
+        # Find best results from our results list
+        if self.results:
+            best_result = max(self.results, key=lambda x: x.get('test_auc', 0))
+            best_auc = best_result.get('test_auc', 0)
+            best_accuracy = best_result.get('test_accuracy', 0)
+        else:
+            best_auc = 0
+            best_accuracy = 0
         
-        # Save study
-        study_path = f"{self.log_dir}/optuna_study_{study_name}.pkl"
-        with open(study_path, "wb") as f:
-            import pickle
-            pickle.dump(study, f)
+        print(f"\n{'='*60}")
+        print(f"Optuna optimization completed!")
+        print(f"Best AUC: {best_auc:.4f}")
+        print(f"Best Accuracy: {best_accuracy:.4f}")
+        print(f"Best trial: {study.best_trial.number}")
+        print(f"Best parameters: {study.best_params}")
+        print(f"{'='*60}")
         
-        # Create best configuration
-        best_config = {
-            **best_params,
-            "best_accuracy": best_accuracy,
-            "mode": mode,
-            "loss_type": loss_type,
-            "optimization_method": "optuna",
-            "sampler": sampler,
-            "pruner": pruner
-        }
-        
-        return best_config, results_df, study
+        return self.results
     
-    def visualize_results(self, study, save_dir=None):
-        """
-        Create visualization plots for the optimization results.
-        
-        Args:
-            study: Optuna study object
-            save_dir: Directory to save plots (defaults to log_dir)
-        """
-        if save_dir is None:
-            save_dir = self.log_dir
-        
-        try:
-            import matplotlib.pyplot as plt
+    def _save_results(self, study):
+        """Save optimization results to CSV."""
+        if self.results:
+            df = pd.DataFrame(self.results)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{self.log_dir}/optuna_results_{timestamp}.csv"
+            df.to_csv(filename, index=False)
+            print(f"Results saved to {filename}")
             
-            # Optimization history
-            fig, ax = plt.subplots(figsize=(10, 6))
-            optuna.visualization.matplotlib.plot_optimization_history(study, ax=ax)
-            plt.title("Optimization History")
-            plt.tight_layout()
-            plt.savefig(f"{save_dir}/optimization_history.png", dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            # Parameter importance
-            fig, ax = plt.subplots(figsize=(10, 6))
-            optuna.visualization.matplotlib.plot_param_importances(study, ax=ax)
-            plt.title("Parameter Importance")
-            plt.tight_layout()
-            plt.savefig(f"{save_dir}/parameter_importance.png", dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            # Parameter relationships
-            fig, ax = plt.subplots(figsize=(12, 8))
-            optuna.visualization.matplotlib.plot_parallel_coordinate(study, ax=ax)
-            plt.title("Parameter Relationships")
-            plt.tight_layout()
-            plt.savefig(f"{save_dir}/parameter_relationships.png", dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            print(f"Visualization plots saved to {save_dir}")
-            
-        except ImportError:
-            print("Matplotlib not available for visualization")
-        except Exception as e:
-            print(f"Error creating visualizations: {e}") 
+            # Save study using pickle
+            import pickle
+            study_filename = f"{self.log_dir}/optuna_study_{timestamp}.pkl"
+            with open(study_filename, 'wb') as f:
+                pickle.dump(study, f)
+            print(f"Study saved to {study_filename}")

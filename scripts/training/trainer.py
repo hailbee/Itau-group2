@@ -14,14 +14,16 @@ class Trainer:
     Unified training interface for both pair and triplet models.
     Handles training, validation, and logging.
     """
-    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv"):
+    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv", model_type=None):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.device = device
         self.log_csv_path = log_csv_path
+        self.model_type = model_type
         self.model.to(device)
-        self.evaluator = Evaluator(model)
+        print(f"[DEBUG] Trainer init - model_type: {model_type}")
+        self.evaluator = Evaluator(model, model_type=model_type)
 
     def train_epoch(self, dataloader, mode="pair"):
         """Train for one epoch"""
@@ -29,8 +31,18 @@ class Trainer:
         epoch_loss = 0.0
         
         for i, batch in enumerate(dataloader):
-            # Unified logic: model and criterion handle all modes
-            outputs = self.model(*batch)
+            # Handle different modes based on expected inputs
+            if mode == "triplet":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            elif mode == "supcon":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            elif mode == "infonce":
+                anchor_texts, positive_texts, negative_texts = batch
+                outputs = self.model(anchor_texts, positive_texts, negative_texts)
+            else:  # pair mode
+                outputs = self.model(*batch)
             loss = self.criterion(*outputs)
 
             self.optimizer.zero_grad()
@@ -67,14 +79,18 @@ class Trainer:
         Returns:
             dict: Best metrics achieved during training
         """
-        # bandit learning setup 
-        datasets = {
-            "easy": warmup_loader.dataset,
-            "hard": dataloader.dataset
-        }
-
-        # bandit learning tracking
-        rewards = {k: [] for k in datasets}
+        # bandit learning setup - only if warmup_loader is provided
+        if warmup_loader is not None:
+            datasets = {
+                "easy": warmup_loader.dataset,
+                "hard": dataloader.dataset
+            }
+            # bandit learning tracking
+            rewards = {k: [] for k in datasets}
+        else:
+            datasets = {}
+            rewards = {}
+        
         # keeping track of accuracy
         prev_accuracy = 0.0
         best_metrics = {
@@ -97,8 +113,8 @@ class Trainer:
 
             for epoch in range(epochs):
                 
-                # self paced curriculum learning
-                if curriculum == "self":
+                # self paced curriculum learning - only if warmup_loader is provided
+                if curriculum == "self" and warmup_loader is not None:
                     hard_ratio = min(0.1 * epoch, 1.0)
                     easy_ratio = 1.0 - hard_ratio
 
@@ -116,8 +132,8 @@ class Trainer:
 
                     current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
                 
-                # bandit curriculum learning
-                elif curriculum == "bandit":
+                # bandit curriculum learning - only if warmup_loader is provided
+                elif curriculum == "bandit" and warmup_loader is not None:
 
                     # exploration rate
                     epsilon = 0.1 
@@ -176,7 +192,7 @@ class Trainer:
                 # Evaluate
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
 
-                if curriculum == "bandit":
+                if curriculum == "bandit" and warmup_loader is not None:
                     delta_acc = metrics['accuracy'] - prev_accuracy
                     prev_accuracy = metrics['accuracy']
                     rewards[chosen_dataset_name].append(delta_acc)
