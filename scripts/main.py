@@ -18,7 +18,7 @@ def main():
                       help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
     parser.add_argument('--reference_filepath', type=str,
                       help='Path to reference data')
-    parser.add_argument('--test_reference_filepath', type=str, required=True,
+    parser.add_argument('--test_reference_filepath', type=str,
                       help='Path to test reference data')
     parser.add_argument('--test_filepath', type=str, required=True,
                       help='Path to test data')
