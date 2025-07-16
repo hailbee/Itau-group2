@@ -14,6 +14,10 @@ class GeneralizedEmbeddingExtractor(nn.Module):
     def forward(self, texts):
         return self.model_wrapper.encode_text(texts)
     
+    def encode(self, texts):
+        """Alias for encode_text to match expected interface."""
+        return self.model_wrapper.encode_text(texts)
+    
     def to(self, device):
         """Move the model wrapper to the specified device."""
         self.model_wrapper.to(device)
