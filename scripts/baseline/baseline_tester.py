@@ -144,7 +144,7 @@ class BaselineTester:
             print(f"Optimal threshold: {metrics['threshold']:.4f}")
             return results_df, metrics
     
-    def test_all_models(self, reference_filepath, test_filepath):
+    def test_all_models(self, reference_filepath, test_filepath, external=False):
         """
         Test all available models and compare their performance.
         
