@@ -16,12 +16,12 @@ def main():
                       choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'pbt', 'compare', 'baseline'], 
                       required=True,
                       help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
-    parser.add_argument('--reference_filepath', type=str,
-                      help='Path to reference data')
+    parser.add_argument('--training_filepath', type=str,
+                      help='Path to training data (for training modes)')
     parser.add_argument('--test_reference_filepath', type=str,
-                      help='Path to test reference data')
+                      help='Path to reference data for evaluation (CSV with normalized_company)')
     parser.add_argument('--test_filepath', type=str, required=True,
-                      help='Path to test data')
+                      help='Path to test data. If test_reference_filepath is provided, this should be a test set (CSV with company, label). If not, this should be a pairwise file (CSV/PKL with fraudulent_name, real_name, label).')
     parser.add_argument('--model_type', type=str, choices=['pair', 'triplet', 'supcon', 'infonce'], default='pair',
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
@@ -104,17 +104,11 @@ def main():
 
     if args.mode == 'baseline':
         from scripts.baseline.baseline_tester import BaselineTester
-        # Check required arguments for non-external mode
-        if not args.external:
-            if not args.reference_filepath or not args.test_reference_filepath:
-                parser.error('--reference_filepath and --test_reference_filepath are required unless --external is set')
         # Test baseline model(s) performance
         if args.baseline_model == 'all':
-            # Test all available models
             print("Testing all available baseline models...")
             tester = BaselineTester(model_type='clip', batch_size=args.batch_size, device=device)
-            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath, external=args.external)
-            
+            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath)
             print("\nBaseline Results Summary:")
             for model_type, result in all_results.items():
                 if 'error' in result:
@@ -125,16 +119,9 @@ def main():
                           f"Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, "
                           f"ROC AUC={metrics['roc_auc']:.4f}")
         else:
-            # Test single model
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath, external=args.external)
-
-            if args.external:
-                print(f"\n{args.baseline_model.upper()} Baseline Results (External):")
-            else:
-                print(f"\n{args.baseline_model.upper()} Baseline Results:")
-            
+            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             print(f"Accuracy: {metrics['accuracy']:.4f}")
             print(f"Precision: {metrics['precision']:.4f}")
@@ -182,7 +169,7 @@ def main():
         from torch.utils.data import DataLoader
         
         # Load training data
-        dataframe = pd.read_pickle(args.reference_filepath)
+        dataframe = pd.read_pickle(args.training_filepath)
         
         # Create appropriate dataset and dataloader based on model type
         if args.model_type == "pair":
@@ -263,7 +250,7 @@ def main():
         internal_layer_sizes = ast.literal_eval(args.internal_layer_sizes)
         
         best_config, results_df = searcher.search(
-            reference_filepath=args.reference_filepath,
+            reference_filepath=args.test_reference_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             lrs=lrs,
@@ -305,7 +292,7 @@ def main():
         
         results = optimizer.optimize(
             method=args.mode,
-            reference_filepath=args.reference_filepath,
+            reference_filepath=args.test_reference_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
@@ -339,7 +326,7 @@ def main():
         }
         
         results = optimizer.compare_methods(
-            reference_filepath=args.reference_filepath,
+            reference_filepath=args.test_reference_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,

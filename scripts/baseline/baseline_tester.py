@@ -62,100 +62,35 @@ class BaselineTester:
         """Encode texts using the selected model."""
         return self.model_wrapper.encode_text(texts)
 
-    def test_external(self, test_filepath):
+    def test(self, test_reference_filepath, test_filepath):
         """
-        Evaluate on an external dataset of name pairs (no reference set).
+        Test the selected model performance.
         Args:
-            test_filepath: Path to a CSV file with columns ['fraudulent_name', 'real_name', 'label']
+            test_reference_filepath: Path to reference data for evaluation (or None for pairwise mode)
+            test_filepath: Path to test data
         Returns:
             tuple: (results_df, metrics)
         """
-        import pandas as pd
-        import torch
-        import numpy as np
-        from sklearn.metrics import roc_curve, precision_score, recall_score, accuracy_score, roc_auc_score
-        from utils.evals import find_best_threshold_youden
-        # Load data (CSV only)
-        if test_filepath.endswith('.csv'):
-            df = pd.read_csv(test_filepath)
+        if test_reference_filepath is not None:
+            print(f"Testing {self.model_type.upper()} model (reference/test mode)...")
+            results_df, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
         else:
-            raise ValueError("Only CSV (.csv) files are supported for external evaluation.")
-        # Extract columns
-        fraud_names = df['fraudulent_name'].astype(str).tolist()
-        real_names = df['real_name'].astype(str).tolist()
-        labels = df['label'].astype(float).tolist()
-        # Batch encode
-        batch_size = self.batch_size
-        fraud_embs = []
-        real_embs = []
-        for i in range(0, len(fraud_names), batch_size):
-            fraud_embs.append(self.model_wrapper.encode_text(fraud_names[i:i+batch_size]).to(self.device))
-            real_embs.append(self.model_wrapper.encode_text(real_names[i:i+batch_size]).to(self.device))
-        fraud_embs = torch.cat(fraud_embs, dim=0)
-        real_embs = torch.cat(real_embs, dim=0)
-        # Cosine similarity for each pair
-        similarities = torch.nn.functional.cosine_similarity(fraud_embs, real_embs, dim=1).cpu().numpy()
-        # Build results DataFrame
-        results_df = pd.DataFrame({
-            'fraudulent_name': fraud_names,
-            'real_name': real_names,
-            'label': labels,
-            'similarity': similarities
-        })
-        # Compute metrics
-        y_true = results_df['label']
-        y_scores = results_df['similarity']
-        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-        youden_thresh = find_best_threshold_youden(fpr, tpr, thresholds)
-        y_pred = (y_scores > youden_thresh).astype(int)
-        roc_auc = roc_auc_score(y_true, y_scores)
-        metrics = {
-            'accuracy': accuracy_score(y_true, y_pred),
-            'precision': precision_score(y_true, y_pred, zero_division=0),
-            'recall': recall_score(y_true, y_pred, zero_division=0),
-            'threshold': youden_thresh,
-            'roc_curve': (fpr, tpr, thresholds),
-            'roc_auc': roc_auc
-        }
-        print(f"\nExternal Dataset Performance:")
+            print(f"Testing {self.model_type.upper()} model (pairwise mode)...")
+            results_df, metrics = self.evaluator.test_pairs(test_filepath)
+        print(f"\n{self.model_type.upper()} Performance:")
         print(f"Accuracy: {metrics['accuracy']:.4f}")
         print(f"Precision: {metrics['precision']:.4f}")
         print(f"Recall: {metrics['recall']:.4f}")
         print(f"ROC AUC: {metrics['roc_auc']:.4f}")
         print(f"Optimal threshold: {metrics['threshold']:.4f}")
         return results_df, metrics
-
-    def test(self, reference_filepath, test_filepath, external=False):
-        """
-        Test the selected model performance.
-        Args:
-            reference_filepath: Path to reference data (ignored if external=True)
-            test_filepath: Path to test data
-            external: If True, use external pairwise evaluation (no reference set)
-        Returns:
-            tuple: (results_df, metrics)
-        """
-        if external:
-            return self.test_external(test_filepath)
-        else:
-            print(f"Testing {self.model_type.upper()} model...")
-            results_df, metrics = self.evaluator.evaluate(reference_filepath, test_filepath)
-            print(f"\n{self.model_type.upper()} Performance:")
-            print(f"Accuracy: {metrics['accuracy']:.4f}")
-            print(f"Precision: {metrics['precision']:.4f}")
-            print(f"Recall: {metrics['recall']:.4f}")
-            print(f"ROC AUC: {metrics['roc_auc']:.4f}")
-            print(f"Optimal threshold: {metrics['threshold']:.4f}")
-            return results_df, metrics
     
-    def test_all_models(self, reference_filepath, test_filepath, external=False):
+    def test_all_models(self, test_reference_filepath, test_filepath):
         """
         Test all available models and compare their performance.
-        
         Args:
-            reference_filepath: Path to reference data
+            test_reference_filepath: Path to reference data for evaluation (or None for pairwise mode)
             test_filepath: Path to test data
-            
         Returns:
             dict: Dictionary with results for each model
         """
@@ -170,7 +105,7 @@ class BaselineTester:
             try:
                 # Create new tester for each model
                 tester = BaselineTester(model_type, batch_size=self.batch_size, device=self.device)
-                results_df, metrics = tester.test(reference_filepath, test_filepath, external=external)
+                results_df, metrics = tester.test(test_reference_filepath, test_filepath)
                 all_results[model_type] = {
                     'results_df': results_df,
                     'metrics': metrics
