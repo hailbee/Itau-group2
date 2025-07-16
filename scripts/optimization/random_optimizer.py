@@ -16,14 +16,14 @@ class RandomOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="random_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50):
         """
         Run random search optimization.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -47,7 +47,7 @@ class RandomOptimizer(BaseOptimizer):
             print(f"{'='*50}")
             
             result = self.evaluate_trial(
-                params, reference_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             print(f"\nTrial {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")

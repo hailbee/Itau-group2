@@ -65,7 +65,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         
         return new_params
     
-    def train_population(self, population, reference_filepath, test_reference_filepath, test_filepath,
+    def train_population(self, population, training_filepath, test_reference_filepath, test_filepath,
                         mode, loss_type, warmup_filepath=None, epochs_per_generation=5, 
                         warmup_epochs=5, generations=10, evolution_frequency=2):
         """
@@ -73,7 +73,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         
         Args:
             population: List of hyperparameter dictionaries
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -88,7 +88,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         print(f"Will run for {generations} generations with {epochs_per_generation} epochs each")
         
         # Load data
-        dataframe = pd.read_pickle(reference_filepath)
+        dataframe = pd.read_pickle(training_filepath)
         warmup_dataframe = None
         if warmup_filepath:
             warmup_dataframe = pd.read_pickle(warmup_filepath)
@@ -259,7 +259,7 @@ class PopulationBasedTrainer(BaseOptimizer):
             
             print(f"Evolved member {i+1} from member {source_idx+1}")
     
-    def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs_per_generation=5, warmup_epochs=5, generations=10,
                 population_size=8, evolution_frequency=2):
@@ -267,7 +267,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         Run PBT optimization.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -288,7 +288,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         
         # Train population
         return self.train_population(
-            population, reference_filepath, test_reference_filepath, test_filepath,
+            population, training_filepath, test_reference_filepath, test_filepath,
             mode, loss_type, warmup_filepath, epochs_per_generation, 
             warmup_epochs, generations, evolution_frequency
         )

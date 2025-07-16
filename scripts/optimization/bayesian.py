@@ -18,14 +18,14 @@ class BayesianOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="bayesian_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_calls=50, n_random_starts=10):
         """
         Run Bayesian optimization.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -50,7 +50,7 @@ class BayesianOptimizer(BaseOptimizer):
             print(f"{'='*50}")
             
             result = self.evaluate_trial(
-                params, reference_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             print(f"\nInitial Sample {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
@@ -66,7 +66,7 @@ class BayesianOptimizer(BaseOptimizer):
             
             # Evaluate the new point
             result = self.evaluate_trial(
-                next_params, reference_filepath, test_reference_filepath, test_filepath,
+                next_params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             print(f"\nBayesian Iteration {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")

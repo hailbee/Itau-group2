@@ -217,7 +217,7 @@ class BaseOptimizer:
         """
         return self.sample_hyperparameters(mode, n_samples)
     
-    def evaluate_trial(self, params, reference_filepath, test_reference_filepath,
+    def evaluate_trial(self, params, training_filepath, test_reference_filepath,
                       test_filepath, mode, loss_type, warmup_filepath=None,
                       epochs=5, warmup_epochs=5):
         """
@@ -241,7 +241,7 @@ class BaseOptimizer:
             print(f"Testing parameters: {param_str}")
             
             # Load data
-            dataframe = pd.read_pickle(reference_filepath)
+            dataframe = pd.read_pickle(training_filepath)
             warmup_dataframe = None
             if warmup_filepath:
                 warmup_dataframe = pd.read_pickle(warmup_filepath)

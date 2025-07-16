@@ -22,14 +22,14 @@ class OptunaOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="optuna_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def objective(self, trial, reference_filepath, test_reference_filepath, test_filepath,
+    def objective(self, trial, training_filepath, test_reference_filepath, test_filepath,
                  mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5):
         """
         Objective function for Optuna optimization.
         
         Args:
             trial: Optuna trial object
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -81,7 +81,7 @@ class OptunaOptimizer(BaseOptimizer):
             
             # Use the base class evaluate_trial method
             result = self.evaluate_trial(
-                params, reference_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
             
@@ -97,7 +97,7 @@ class OptunaOptimizer(BaseOptimizer):
             print(f"\nTrial {trial.number + 1} failed with error: {e}")
             return 0.0
     
-    def optimize(self, reference_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50, sampler="tpe", 
                 pruner="median", study_name=None):
@@ -105,7 +105,7 @@ class OptunaOptimizer(BaseOptimizer):
         Run Optuna optimization.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
@@ -156,7 +156,7 @@ class OptunaOptimizer(BaseOptimizer):
         # Define objective wrapper
         def objective_wrapper(trial):
             return self.objective(
-                trial, reference_filepath, test_reference_filepath, test_filepath,
+                trial, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs
             )
         
