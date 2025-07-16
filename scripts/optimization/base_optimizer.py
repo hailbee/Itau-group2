@@ -241,10 +241,10 @@ class BaseOptimizer:
             print(f"Testing parameters: {param_str}")
             
             # Load data
-            dataframe = pd.read_pickle(training_filepath)
+            dataframe = pd.read_parquet(training_filepath)
             warmup_dataframe = None
             if warmup_filepath:
-                warmup_dataframe = pd.read_pickle(warmup_filepath)
+                warmup_dataframe = pd.read_parquet(warmup_filepath)
             
             # Create dataloaders
             dataloader = self.create_dataloader(dataframe, batch_size, mode)

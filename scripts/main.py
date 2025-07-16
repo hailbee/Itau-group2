@@ -169,7 +169,7 @@ def main():
         from torch.utils.data import DataLoader
         
         # Load training data
-        dataframe = pd.read_pickle(args.training_filepath)
+        dataframe = pd.read_parquet(args.training_filepath)
         
         # Create appropriate dataset and dataloader based on model type
         if args.model_type == "pair":
@@ -192,7 +192,7 @@ def main():
         # Create warmup dataloader if warmup filepath is provided
         warmup_loader = None
         if args.warmup_filepath:
-            warmup_dataframe = pd.read_pickle(args.warmup_filepath)
+            warmup_dataframe = pd.read_parquet(args.warmup_filepath)
             if args.model_type == "pair":
                 from utils.data import TextPairDataset
                 warmup_dataset = TextPairDataset(warmup_dataframe)

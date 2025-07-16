@@ -84,9 +84,9 @@ class GridSearcher:
         best_config = {}
 
         # Load data
-        dataframe = pd.read_pickle(training_filepath)
+        dataframe = pd.read_parquet(training_filepath)
         if warmup_filepath:
-            warmup_dataframe = pd.read_pickle(warmup_filepath)
+            warmup_dataframe = pd.read_parquet(warmup_filepath)
 
         # Get loss class
         loss_class = self.get_loss_class(mode, loss_type)

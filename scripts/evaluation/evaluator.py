@@ -125,7 +125,7 @@ class Evaluator:
         """
         Evaluate model on a file of (fraudulent_name, real_name, label) pairs.
         Args:
-            test_filepath: Path to test data (CSV or PKL with fraudulent_name, real_name, label)
+            test_filepath: Path to test data (CSV or PARQUET with fraudulent_name, real_name, label)
         Returns:
             tuple: (results_df, metrics)
         """
@@ -139,7 +139,7 @@ class Evaluator:
         if test_filepath.endswith('.csv'):
             df = pd.read_csv(test_filepath)
         else:
-            df = pd.read_pickle(test_filepath)
+            df = pd.read_parquet(test_filepath)
         fraud_names = df['fraudulent_name'].astype(str).tolist()
         real_names = df['real_name'].astype(str).tolist()
         labels = df['label'].astype(float).tolist()

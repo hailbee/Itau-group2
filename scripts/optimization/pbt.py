@@ -88,10 +88,10 @@ class PopulationBasedTrainer(BaseOptimizer):
         print(f"Will run for {generations} generations with {epochs_per_generation} epochs each")
         
         # Load data
-        dataframe = pd.read_pickle(training_filepath)
+        dataframe = pd.read_parquet(training_filepath)
         warmup_dataframe = None
         if warmup_filepath:
-            warmup_dataframe = pd.read_pickle(warmup_filepath)
+            warmup_dataframe = pd.read_parquet(warmup_filepath)
         
         # Initialize population models
         models = []
