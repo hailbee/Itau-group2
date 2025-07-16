@@ -16,7 +16,7 @@ def main():
                       choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'pbt', 'compare', 'baseline'], 
                       required=True,
                       help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
-    parser.add_argument('--reference_filepath', type=str, required=True,
+    parser.add_argument('--reference_filepath', type=str,
                       help='Path to reference data')
     parser.add_argument('--test_reference_filepath', type=str, required=True,
                       help='Path to test reference data')
@@ -34,6 +34,8 @@ def main():
                       help='Batch size for processing')
     parser.add_argument('--warmup_filepath', type=str,
                       help='Path to warmup data (optional)')
+    parser.add_argument('--external', action='store_true', default=False,
+                      help='If set, evaluate on an external pairwise dataset (no reference set, only test_filepath required)')
     
     # Grid search parameters
     parser.add_argument('--lrs', type=str, default='[1e-4]',
@@ -101,12 +103,17 @@ def main():
             raise ValueError(f"Unknown mode: {mode}")
 
     if args.mode == 'baseline':
+        from scripts.baseline.baseline_tester import BaselineTester
+        # Check required arguments for non-external mode
+        if not args.external:
+            if not args.reference_filepath or not args.test_reference_filepath:
+                parser.error('--reference_filepath and --test_reference_filepath are required unless --external is set')
         # Test baseline model(s) performance
         if args.baseline_model == 'all':
             # Test all available models
             print("Testing all available baseline models...")
             tester = BaselineTester(model_type='clip', batch_size=args.batch_size, device=device)
-            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath)
+            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath, external=args.external)
             
             print("\nBaseline Results Summary:")
             for model_type, result in all_results.items():
@@ -121,7 +128,12 @@ def main():
             # Test single model
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath)
+            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath, external=args.external)
+
+            if args.external:
+                print(f"\n{args.baseline_model.upper()} Baseline Results (External):")
+            else:
+                print(f"\n{args.baseline_model.upper()} Baseline Results:")
             
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             print(f"Accuracy: {metrics['accuracy']:.4f}")
