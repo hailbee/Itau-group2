@@ -55,7 +55,7 @@ class GridSearcher:
             return InfoNCELoss
         raise ValueError(f"Unsupported mode/loss_type combination: {mode}/{loss_type}")
 
-    def search(self, reference_filepath, test_reference_filepath, test_filepath,
+    def search(self, training_filepath, test_reference_filepath, test_filepath,
               lrs, batch_sizes, margins, internal_layer_sizes,
               mode="pair", loss_type="cosine", warmup_filepath=None,
               epochs=5, warmup_epochs=5, temperature=0.07):
@@ -63,7 +63,7 @@ class GridSearcher:
         Perform grid search over hyperparameters.
         
         Args:
-            reference_filepath: Path to training data
+            training_filepath: Path to training data
             test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             lrs: List of learning rates to try
@@ -84,7 +84,7 @@ class GridSearcher:
         best_config = {}
 
         # Load data
-        dataframe = pd.read_pickle(reference_filepath)
+        dataframe = pd.read_pickle(training_filepath)
         if warmup_filepath:
             warmup_dataframe = pd.read_pickle(warmup_filepath)
 

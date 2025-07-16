@@ -38,7 +38,7 @@ class Evaluator:
             dim=2
         )
 
-    def test_model(self, reference_filepath, test_filepath):
+    def test_model(self, test_reference_filepath, test_filepath):
         """
         Test model on reference and test data.
         
@@ -50,7 +50,7 @@ class Evaluator:
             pd.DataFrame: Results with predictions and metrics
         """
         # Load data
-        reference_names = pd.read_csv(reference_filepath)['normalized_company'].tolist()
+        reference_names = pd.read_csv(test_reference_filepath)['normalized_company'].tolist()
         test_data = pd.read_csv(test_filepath)
         test_names = test_data['company'].tolist()
         test_labels = test_data['label'].tolist()
@@ -108,16 +108,16 @@ class Evaluator:
         
         return metrics
 
-    def evaluate(self, reference_filepath, test_filepath):
+    def evaluate(self, test_reference_filepath, test_filepath):
         """
         Complete evaluation pipeline for reference/test mode.
         Args:
-            reference_filepath: Path to reference data (CSV with normalized_company)
+            test_reference_filepath: Path to reference data (CSV with normalized_company)
             test_filepath: Path to test data (CSV with company, label)
         Returns:
             tuple: (results_df, metrics)
         """
-        results_df = self.test_model(reference_filepath, test_filepath)
+        results_df = self.test_model(test_reference_filepath, test_filepath)
         metrics = self.compute_metrics(results_df)
         return results_df, metrics
 

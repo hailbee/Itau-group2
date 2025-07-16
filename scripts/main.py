@@ -250,7 +250,7 @@ def main():
         internal_layer_sizes = ast.literal_eval(args.internal_layer_sizes)
         
         best_config, results_df = searcher.search(
-            reference_filepath=args.test_reference_filepath,
+            training_filepath=args.training_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             lrs=lrs,
@@ -292,7 +292,7 @@ def main():
         
         results = optimizer.optimize(
             method=args.mode,
-            reference_filepath=args.test_reference_filepath,
+            training_filepath=args.training_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
@@ -326,7 +326,7 @@ def main():
         }
         
         results = optimizer.compare_methods(
-            reference_filepath=args.test_reference_filepath,
+            training_filepath=args.training_filepath,
             test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
