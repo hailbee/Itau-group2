@@ -79,14 +79,18 @@ class Trainer:
         Returns:
             dict: Best metrics achieved during training
         """
-        # bandit learning setup 
-        datasets = {
-            "easy": warmup_loader.dataset,
-            "hard": dataloader.dataset
-        }
-
-        # bandit learning tracking
-        rewards = {k: [] for k in datasets}
+        # bandit learning setup - only if warmup_loader is provided
+        if warmup_loader is not None:
+            datasets = {
+                "easy": warmup_loader.dataset,
+                "hard": dataloader.dataset
+            }
+            # bandit learning tracking
+            rewards = {k: [] for k in datasets}
+        else:
+            datasets = {}
+            rewards = {}
+        
         # keeping track of accuracy
         prev_accuracy = 0.0
         best_metrics = {
@@ -109,8 +113,8 @@ class Trainer:
 
             for epoch in range(epochs):
                 
-                # self paced curriculum learning
-                if curriculum == "self":
+                # self paced curriculum learning - only if warmup_loader is provided
+                if curriculum == "self" and warmup_loader is not None:
                     hard_ratio = min(0.1 * epoch, 1.0)
                     easy_ratio = 1.0 - hard_ratio
 
@@ -128,8 +132,8 @@ class Trainer:
 
                     current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
                 
-                # bandit curriculum learning
-                elif curriculum == "bandit":
+                # bandit curriculum learning - only if warmup_loader is provided
+                elif curriculum == "bandit" and warmup_loader is not None:
 
                     # exploration rate
                     epsilon = 0.1 
@@ -188,7 +192,7 @@ class Trainer:
                 # Evaluate
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
 
-                if curriculum == "bandit":
+                if curriculum == "bandit" and warmup_loader is not None:
                     delta_acc = metrics['accuracy'] - prev_accuracy
                     prev_accuracy = metrics['accuracy']
                     rewards[chosen_dataset_name].append(delta_acc)
