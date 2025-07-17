@@ -153,7 +153,7 @@ class Evaluator:
         real_embs = batched_embedding(self.extractor, real_names, self.batch_size)
 
         # Cosine similarity for each pair
-        similarities = F.cosine_similarity(fraud_embs, real_embs, dim=1).cpu().numpy()
+        similarities = F.cosine_similarity(fraud_embs, real_embs, dim=1).detach().cpu().numpy()
 
         # Build results DataFrame
         results_df = pd.DataFrame({
