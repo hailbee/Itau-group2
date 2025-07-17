@@ -227,6 +227,15 @@ class BaseOptimizer:
             Dictionary with results
         """
         import json
+        def convert_np(obj):
+            if isinstance(obj, dict):
+                return {k: convert_np(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_np(v) for v in obj]
+            elif hasattr(obj, 'item') and callable(obj.item):
+                return obj.item()
+            else:
+                return obj
         try:
             # Convert numpy types to Python types
             batch_size = int(params['batch_size'])
@@ -323,7 +332,7 @@ class BaseOptimizer:
                 self.best_accuracy = best_metrics['accuracy']
                 torch.save(model.state_dict(), os.path.join(self.log_dir, 'best_model.pt'))
                 with open(os.path.join(self.log_dir, 'best_hparams.json'), 'w') as f:
-                    json.dump(params, f)
+                    json.dump(convert_np(params), f)
             
             return result
             

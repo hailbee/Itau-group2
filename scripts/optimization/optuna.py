@@ -89,7 +89,7 @@ class OptunaOptimizer(BaseOptimizer):
             result["trial_number"] = trial.number + 1
             
             # Print trial result with better spacing
-            print(f"\nTrial {trial.number + 1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nTrial {trial.number + 1} completed.")
             
             return result.get('test_accuracy', 0.0)
             

@@ -210,7 +210,7 @@ class PopulationBasedTrainer(BaseOptimizer):
                 if best_metrics.get('accuracy', 0) > self.best_accuracy:
                     self.best_accuracy = best_metrics['accuracy']
                 
-                print(f"\nMember {i+1} completed - AUC: {best_metrics.get('roc_auc', 0):.4f}, Accuracy: {best_metrics.get('accuracy', 0):.4f}")
+                print(f"\nMember {i+1} completed.")
             
             # Evolve population if needed
             if (generation + 1) % evolution_frequency == 0 and generation < generations - 1:

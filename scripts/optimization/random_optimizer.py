@@ -50,7 +50,7 @@ class RandomOptimizer(BaseOptimizer):
                 params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
-            print(f"\nTrial {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nTrial {i+1} completed.")
         
         # Save results
         self._save_results()

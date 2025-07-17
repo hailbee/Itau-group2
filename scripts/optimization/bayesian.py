@@ -53,7 +53,7 @@ class BayesianOptimizer(BaseOptimizer):
                 params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
-            print(f"\nInitial Sample {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nInitial Sample {i+1} completed.")
         
         # Bayesian optimization loop
         for i in range(n_calls - n_random_starts):
@@ -69,7 +69,7 @@ class BayesianOptimizer(BaseOptimizer):
                 next_params, training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
-            print(f"\nBayesian Iteration {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
+            print(f"\nBayesian Iteration {i+1} completed.")
         
         # Save results
         self._save_results()
