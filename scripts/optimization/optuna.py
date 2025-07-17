@@ -42,19 +42,19 @@ class OptunaOptimizer(BaseOptimizer):
             float: Objective value (accuracy)
         """
         # Suggest hyperparameters
-        lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
         batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
         internal_layer_size = trial.suggest_categorical("internal_layer_size", [64, 128, 256, 512])
         
         if mode in ["supcon", "infonce"]:
             temperature = trial.suggest_float("temperature", 0.01, 1.0, log=True)
-            margin_or_temp = temperature
+            params['temperature'] = temperature
         else:
-            margin = trial.suggest_float("margin", 0.1, 2.0)
-            margin_or_temp = margin
+            margin = trial.suggest_float("margin", 0.2, 1.0)
+            params['margin'] = margin
         
         # Optional: suggest optimizer
-        optimizer_name = trial.suggest_categorical("optimizer", ["adam", "adamw", "sgd"])
+        optimizer_name = trial.suggest_categorical("optimizer", ["adam"])
         
         # Optional: suggest weight decay
         weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
@@ -67,11 +67,6 @@ class OptunaOptimizer(BaseOptimizer):
             'optimizer': optimizer_name,
             'weight_decay': weight_decay
         }
-        
-        if mode in ["supcon", "infonce"]:
-            params['temperature'] = temperature
-        else:
-            params['margin'] = margin
         
         try:
             # Print trial separator
