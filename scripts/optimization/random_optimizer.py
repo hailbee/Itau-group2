@@ -18,7 +18,7 @@ class RandomOptimizer(BaseOptimizer):
         
     def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
-                epochs=5, warmup_epochs=5, n_trials=50):
+                epochs=5, warmup_epochs=5, n_trials=50, validate_filepath=None):
         """
         Run random search optimization.
         
@@ -48,7 +48,7 @@ class RandomOptimizer(BaseOptimizer):
             
             result = self.evaluate_trial(
                 params, training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, epochs, warmup_epochs
+                mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             print(f"\nTrial {i+1} completed - AUC: {result.get('test_auc', 0):.4f}, Accuracy: {result.get('test_accuracy', 0):.4f}")
         

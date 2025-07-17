@@ -62,9 +62,9 @@ class Trainer:
 
     # pass in curriculum learning parameter 
     def train(self, dataloader, test_reference_filepath, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None):
+             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None, validate_filepath=None):
         """
-        Main training loop with optional warmup.
+        Main training loop with optional warmup and validation.
         
         Args:
             dataloader: Main training dataloader
@@ -74,9 +74,10 @@ class Trainer:
             epochs: Number of training epochs
             warmup_loader: Optional warmup dataloader
             warmup_epochs: Number of warmup epochs
+            validate_filepath: Path to validation data file (optional)
             
         Returns:
-            dict: Best metrics achieved during training
+            dict: Best metrics achieved during training (including validation)
         """
         # bandit learning setup - only if warmup_loader is provided
         if warmup_loader is not None:
@@ -106,9 +107,14 @@ class Trainer:
         }
         best_epoch_loss = float('inf')
 
+        best_val_metrics = None
+        best_val_epoch = -1
+        val_metrics_at_halfway = None
+        halfway_epoch = epochs // 2
+
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC"])
+            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC", "Val_Accuracy", "Val_Precision", "Val_Recall", "Val_AUC"])
 
             for epoch in range(epochs):
                 
@@ -188,7 +194,19 @@ class Trainer:
                 if avg_loss < best_epoch_loss:
                     best_epoch_loss = avg_loss
 
-                # Evaluate
+                # Evaluate on validation set at halfway and end
+                val_metrics = None
+                if validate_filepath is not None and (epoch == halfway_epoch or epoch == epochs - 1):
+                    print(f"[DEBUG] Evaluating on validation set at epoch {epoch+1}")
+                    val_metrics = self.evaluator.evaluate(None, validate_filepath)
+                    if epoch == halfway_epoch:
+                        val_metrics_at_halfway = val_metrics
+                    # Track best validation metric (AUC)
+                    if best_val_metrics is None or val_metrics['roc_auc'] > best_val_metrics['roc_auc']:
+                        best_val_metrics = val_metrics
+                        best_val_epoch = epoch + 1
+
+                # Evaluate on test set (for logging)
                 metrics = self.evaluate(test_reference_filepath, test_filepath)
 
                 if curriculum == "bandit" and warmup_loader is not None:
@@ -203,13 +221,22 @@ class Trainer:
                     metrics['accuracy'], 
                     metrics['precision'], 
                     metrics['recall'],
-                    metrics.get('roc_auc', None)
+                    metrics.get('roc_auc', None),
+                    val_metrics['accuracy'] if val_metrics else '',
+                    val_metrics['precision'] if val_metrics else '',
+                    val_metrics['recall'] if val_metrics else '',
+                    val_metrics['roc_auc'] if val_metrics else ''
                 ])
 
                 print(f"Epoch {epoch+1} - Test Accuracy: {metrics['accuracy']:.4f} | "
                       f"Precision: {metrics['precision']:.4f} | "
                       f"Recall: {metrics['recall']:.4f} | "
                       f"AUC: {metrics.get('roc_auc', float('nan')):.4f}")
+                if val_metrics:
+                    print(f"Epoch {epoch+1} - Val Accuracy: {val_metrics['accuracy']:.4f} | "
+                          f"Precision: {val_metrics['precision']:.4f} | "
+                          f"Recall: {val_metrics['recall']:.4f} | "
+                          f"AUC: {val_metrics['roc_auc']:.4f}")
 
                 # Track best metrics
                 for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
@@ -225,7 +252,13 @@ class Trainer:
                       f"at epoch {best_epochs[metric]}")
         print(f"Best Loss: {best_epoch_loss:.4f}")
 
-        # Add loss to best_metrics
+        # Add loss and validation to best_metrics
         best_metrics['loss'] = best_epoch_loss
-
+        if best_val_metrics:
+            best_metrics['val_auc'] = best_val_metrics['roc_auc']
+            best_metrics['val_accuracy'] = best_val_metrics['accuracy']
+            best_metrics['val_precision'] = best_val_metrics['precision']
+            best_metrics['val_recall'] = best_val_metrics['recall']
+        if val_metrics_at_halfway:
+            print(f"Validation metrics at halfway (epoch {halfway_epoch+1}): {val_metrics_at_halfway}")
         return best_metrics 

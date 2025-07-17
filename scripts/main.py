@@ -36,6 +36,7 @@ def main():
                       help='Path to warmup data (optional)')
     parser.add_argument('--external', action='store_true', default=False,
                       help='If set, evaluate on an external pairwise dataset (no reference set, only test_filepath required)')
+    parser.add_argument('--validate_filepath', type=str, default=None, help='Path to validation data file (CSV or Parquet). Used for mid-training and end-of-training validation.')
     
     # Grid search parameters
     parser.add_argument('--lrs', type=str, default='[1e-4]',
@@ -219,7 +220,8 @@ def main():
             epochs=args.epochs,
             warmup_loader=warmup_loader,
             warmup_epochs=args.warmup_epochs,
-            curriculum=args.curriculum
+            curriculum=args.curriculum,
+            validate_filepath=args.validate_filepath
         )
 
     elif args.mode == 'grid_search':
@@ -258,7 +260,8 @@ def main():
             epochs=args.epochs,
             warmup_epochs=args.warmup_epochs,
             temperature=args.temperature,
-            curriculum=args.curriculum
+            curriculum=args.curriculum,
+            validate_filepath=args.validate_filepath
         )
         
         print("\nGrid Search Results:")
@@ -293,7 +296,8 @@ def main():
             mode=args.model_type,
             loss_type=args.loss_type,
             warmup_filepath=args.warmup_filepath,
-            **opt_params
+            **opt_params,
+            validate_filepath=args.validate_filepath
         )
         
         print(f"\n{args.mode.upper()} Optimization Results:")
@@ -327,7 +331,8 @@ def main():
             mode=args.model_type,
             loss_type=args.loss_type,
             warmup_filepath=args.warmup_filepath,
-            **opt_params
+            **opt_params,
+            validate_filepath=args.validate_filepath
         )
         
         print(f"\nComparison results saved to: {args.log_dir}")

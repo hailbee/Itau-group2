@@ -139,7 +139,7 @@ class UnifiedHyperparameterOptimizer:
         return new_params
     
     def optimize(self, method, training_filepath, test_reference_filepath, test_filepath,
-                mode="pair", loss_type="cosine", warmup_filepath=None, **kwargs):
+                mode="pair", loss_type="cosine", warmup_filepath=None, validate_filepath=None, **kwargs):
         """
         Run hyperparameter optimization using the specified method.
         """
@@ -149,28 +149,28 @@ class UnifiedHyperparameterOptimizer:
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_bayesian_optimization(
                 training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **filtered
+                mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         elif method == "random":
             allowed = ["n_trials", "epochs", "warmup_epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_random_optimization(
                 training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **filtered
+                mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         elif method == "optuna":
             allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_optuna_optimization(
                 training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **filtered
+                mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         elif method == "pbt":
             allowed = ["population_size", "generations", "epochs_per_generation", "warmup_epochs", "evolution_frequency"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_pbt_optimization(
                 training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, **filtered
+                mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         else:
             raise ValueError(f"Unknown optimization method: {method}")
