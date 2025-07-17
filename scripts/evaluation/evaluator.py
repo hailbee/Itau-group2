@@ -108,16 +108,22 @@ class Evaluator:
 
     def evaluate(self, test_reference_filepath, test_filepath):
         """
-        Complete evaluation pipeline for reference/test mode.
+        Complete evaluation pipeline. Automatically chooses between classic and pairwise evaluation.
         Args:
-            test_reference_filepath: Path to reference data (CSV with normalized_company)
-            test_filepath: Path to test data (CSV with company, label)
+            test_reference_filepath: Path to reference data (CSV with normalized_company) or None
+            test_filepath: Path to test data (CSV with company, label) or pairs data
         Returns:
             tuple: (results_df, metrics)
         """
-        results_df = self.test_model(test_reference_filepath, test_filepath)
-        metrics = self.compute_metrics(results_df)
-        return results_df, metrics
+        # If test_reference_filepath is None, use pairwise evaluation
+        if test_reference_filepath is None:
+            print("[DEBUG] Using pairwise evaluation mode")
+            return self.test_pairs(test_filepath)
+        else:
+            print("[DEBUG] Using classic evaluation mode")
+            results_df = self.test_model(test_reference_filepath, test_filepath)
+            metrics = self.compute_metrics(results_df)
+            return results_df, metrics
 
     def test_pairs(self, test_filepath):
         """
