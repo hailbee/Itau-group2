@@ -22,7 +22,6 @@ class Trainer:
         self.log_csv_path = log_csv_path
         self.model_type = model_type
         self.model.to(device)
-        print(f"[DEBUG] Trainer init - model_type: {model_type}")
         self.evaluator = Evaluator(model, model_type=model_type)
 
     def train_epoch(self, dataloader, mode="pair"):
