@@ -219,13 +219,14 @@ class BaseOptimizer:
     
     def evaluate_trial(self, params, training_filepath, test_reference_filepath,
                       test_filepath, mode, loss_type, warmup_filepath=None,
-                      epochs=5, warmup_epochs=5, validate_filepath=None):
+                      epochs=5, warmup_epochs=5, validate_filepath=None, save_best_model=True):
         """
         Evaluate a single hyperparameter configuration.
         
         Returns:
             Dictionary with results
         """
+        import json
         try:
             # Convert numpy types to Python types
             batch_size = int(params['batch_size'])
@@ -317,10 +318,12 @@ class BaseOptimizer:
             self.results.append(result)
             
             # Update best metrics
-            if best_metrics.get('roc_auc', 0) > self.best_auc:
+            if save_best_model and best_metrics.get('roc_auc', 0) > getattr(self, 'best_auc', 0):
                 self.best_auc = best_metrics['roc_auc']
-            if best_metrics.get('accuracy', 0) > self.best_accuracy:
                 self.best_accuracy = best_metrics['accuracy']
+                torch.save(model.state_dict(), os.path.join(self.log_dir, 'best_model.pt'))
+                with open(os.path.join(self.log_dir, 'best_hparams.json'), 'w') as f:
+                    json.dump(params, f)
             
             return result
             

@@ -165,25 +165,25 @@ class OptunaOptimizer(BaseOptimizer):
         
         # Save results
         self._save_results(study)
-        
-        # Find best results from our results list
-        if self.results:
-            best_result = max(self.results, key=lambda x: x.get('test_auc', 0))
-            best_auc = best_result.get('test_auc', 0)
-            best_accuracy = best_result.get('test_accuracy', 0)
+
+        # After all trials, evaluate the best model on the test set
+        import torch, json, os
+        print("[DEBUG] Evaluating best model on test set after all trials...")
+        best_model_path = os.path.join(self.log_dir, 'best_model.pt')
+        best_hparams_path = os.path.join(self.log_dir, 'best_hparams.json')
+        if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
+            with open(best_hparams_path, 'r') as f:
+                best_params = json.load(f)
+            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
+            model.load_state_dict(torch.load(best_model_path, map_location=self.device))
+            evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
+            model.eval()
+            _, test_metrics = evaluator.evaluate(test_reference_filepath, test_filepath)
+            print("[DEBUG] Final test set evaluation:", test_metrics)
+            return test_metrics
         else:
-            best_auc = 0
-            best_accuracy = 0
-        
-        print(f"\n{'='*60}")
-        print(f"Optuna optimization completed!")
-        print(f"Best AUC: {best_auc:.4f}")
-        print(f"Best Accuracy: {best_accuracy:.4f}")
-        print(f"Best trial: {study.best_trial.number}")
-        print(f"Best parameters: {study.best_params}")
-        print(f"{'='*60}")
-        
-        return self.results
+            print("[DEBUG] No best model found for final test set evaluation.")
+            return self.results
     
     def _save_results(self, study):
         """Save optimization results to CSV."""

@@ -219,6 +219,25 @@ class PopulationBasedTrainer(BaseOptimizer):
         
         # Save results
         self._save_results()
+
+        # After all generations, evaluate the best model on the test set
+        import torch, json, os
+        print("[DEBUG] Evaluating best model on test set after all generations...")
+        best_model_path = os.path.join(self.log_dir, 'best_model.pt')
+        best_hparams_path = os.path.join(self.log_dir, 'best_hparams.json')
+        if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
+            with open(best_hparams_path, 'r') as f:
+                best_params = json.load(f)
+            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
+            model.load_state_dict(torch.load(best_model_path, map_location=self.device))
+            evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
+            model.eval()
+            _, test_metrics = evaluator.evaluate(test_reference_filepath, test_filepath)
+            print("[DEBUG] Final test set evaluation:", test_metrics)
+            return test_metrics
+        else:
+            print("[DEBUG] No best model found for final test set evaluation.")
+            return self.results
         
         print(f"\n{'='*60}")
         print(f"PBT completed!")

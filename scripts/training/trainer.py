@@ -81,7 +81,7 @@ class Trainer:
         best_epoch_loss = float('inf')
         best_val_metrics = None
         val_metrics_at_halfway = None
-        halfway_epoch = epochs // 2
+        halfway_epoch = (epochs - 1) // 2
 
         with open(self.log_csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
