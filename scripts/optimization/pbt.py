@@ -67,7 +67,7 @@ class PopulationBasedTrainer(BaseOptimizer):
     
     def train_population(self, population, training_filepath, test_reference_filepath, test_filepath,
                         mode, loss_type, warmup_filepath=None, epochs_per_generation=5, 
-                        warmup_epochs=5, generations=10, evolution_frequency=2):
+                        warmup_epochs=5, generations=10, evolution_frequency=2, validate_filepath=None):
         """
         Train the population with evolution.
         
@@ -185,7 +185,8 @@ class PopulationBasedTrainer(BaseOptimizer):
                     mode=mode,
                     epochs=epochs_per_generation,
                     warmup_loader=warmup_loader,
-                    warmup_epochs=warmup_epochs
+                    warmup_epochs=warmup_epochs,
+                    validate_filepath=validate_filepath
                 )
                 
                 # Store results
@@ -262,7 +263,7 @@ class PopulationBasedTrainer(BaseOptimizer):
     def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs_per_generation=5, warmup_epochs=5, generations=10,
-                population_size=8, evolution_frequency=2):
+                population_size=8, evolution_frequency=2, validate_filepath=None):
         """
         Run PBT optimization.
         
@@ -289,8 +290,7 @@ class PopulationBasedTrainer(BaseOptimizer):
         # Train population
         return self.train_population(
             population, training_filepath, test_reference_filepath, test_filepath,
-            mode, loss_type, warmup_filepath, epochs_per_generation, 
-            warmup_epochs, generations, evolution_frequency
+            mode, loss_type, warmup_filepath, epochs_per_generation, warmup_epochs, generations, evolution_frequency, validate_filepath
         )
     
     def _save_results(self):

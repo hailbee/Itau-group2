@@ -23,7 +23,7 @@ class OptunaOptimizer(BaseOptimizer):
         super().__init__(model_type, model_name, device, log_dir)
         
     def objective(self, trial, training_filepath, test_reference_filepath, test_filepath,
-                 mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5):
+                 mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5, validate_filepath=None):
         """
         Objective function for Optuna optimization.
         
@@ -82,7 +82,7 @@ class OptunaOptimizer(BaseOptimizer):
             # Use the base class evaluate_trial method
             result = self.evaluate_trial(
                 params, training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, epochs, warmup_epochs
+                mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             
             # Add trial number to result
@@ -100,7 +100,7 @@ class OptunaOptimizer(BaseOptimizer):
     def optimize(self, training_filepath, test_reference_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50, sampler="tpe", 
-                pruner="median", study_name=None):
+                pruner="median", study_name=None, validate_filepath=None):
         """
         Run Optuna optimization.
         
@@ -157,7 +157,7 @@ class OptunaOptimizer(BaseOptimizer):
         def objective_wrapper(trial):
             return self.objective(
                 trial, training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, epochs, warmup_epochs
+                mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
         
         # Run optimization
