@@ -269,7 +269,6 @@ class BaseOptimizer:
                 criterion = loss_class(margin=margin)
             
             # Create trainer and evaluator
-            print(f"[DEBUG] evaluate_trial - mode: {mode}")
             trainer = Trainer(
                 model=model,
                 criterion=criterion,

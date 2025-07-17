@@ -14,8 +14,6 @@ class Evaluator:
         self.batch_size = batch_size
         self.model_type = model_type
         
-        print(f"[DEBUG] Evaluator init - model_type: {model_type}")
-        print(f"[DEBUG] Evaluator init - model class: {type(model).__name__}")
         
         # Create embedding extractor from model based on model type
         if model_type in ['supcon', 'infonce']:
