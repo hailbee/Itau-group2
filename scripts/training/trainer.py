@@ -80,6 +80,7 @@ class Trainer:
 
         best_epoch_loss = float('inf')
         best_val_metrics = None
+        best_val_epoch = -1
         val_metrics_at_halfway = None
         halfway_epoch = (epochs - 1) // 2
 
@@ -158,6 +159,7 @@ class Trainer:
 
                     if best_val_metrics is None or (val_metrics and val_metrics.get('roc_auc', 0) > best_val_metrics.get('roc_auc', 0)):
                         best_val_metrics = val_metrics
+                        best_val_epoch = epoch + 1
 
                 writer.writerow([
                     epoch + 1, 
@@ -175,19 +177,11 @@ class Trainer:
                           f"Recall: {val_metrics['recall']:.4f} | "
                           f"AUC: {val_metrics['roc_auc']:.4f}")
 
-        test_metrics = self.evaluate(test_reference_filepath, test_filepath)
-
-        print(f"\n=== Test Set Evaluation After Training ===")
-        print(f"Test Accuracy: {test_metrics['accuracy']:.4f} | "
-              f"Precision: {test_metrics['precision']:.4f} | "
-              f"Recall: {test_metrics['recall']:.4f} | "
-              f"AUC: {test_metrics.get('roc_auc', float('nan')):.4f}")
-
         print("\n=== Best Epochs Summary ===")
         for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
-            if best_metrics[metric] < test_metrics.get(metric, 0):
-                best_metrics[metric] = test_metrics.get(metric, 0)
-                best_epochs[metric] = epochs
+            if best_metrics[metric] < best_val_metrics.get(metric, 0):
+                best_metrics[metric] = best_val_metrics.get(metric, 0)
+                best_epochs[metric] = best_val_epoch
                 print(f"Best {metric.capitalize()}: {best_metrics[metric]:.4f} at epoch {best_epochs[metric]}")
 
         print(f"Best Loss: {best_epoch_loss:.4f}")
@@ -198,11 +192,8 @@ class Trainer:
             best_metrics['val_accuracy'] = best_val_metrics.get('accuracy', None)
             best_metrics['val_precision'] = best_val_metrics.get('precision', None)
             best_metrics['val_recall'] = best_val_metrics.get('recall', None)
+            best_metrics['val_epoch'] = best_val_epoch
         if val_metrics_at_halfway:
-            print(f"Validation metrics at halfway (epoch {halfway_epoch+1}): {val_metrics_at_halfway}")
-        best_metrics['test_accuracy'] = test_metrics.get('accuracy', None)
-        best_metrics['test_precision'] = test_metrics.get('precision', None)
-        best_metrics['test_recall'] = test_metrics.get('recall', None)
-        best_metrics['test_roc_auc'] = test_metrics.get('roc_auc', None)
+            pass # Removed print statement
 
         return best_metrics 
