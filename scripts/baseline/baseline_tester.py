@@ -43,16 +43,13 @@ class BaselineTester:
         self.batch_size = batch_size
         self.model_type = model_type
 
-        print(f"[DEBUG] Requested model_type: {model_type}")
 
         # Use ModelFactory to create the model wrapper
         try:
             self.model_wrapper = ModelFactory.create_model(
                 model_type, model_name, self.device
             )
-            print(f"[DEBUG] Successfully loaded model: {model_type}")
         except Exception as e:
-            print(f"[ERROR] Failed to load model {model_type}: {e}")
             raise e
 
         self.extractor = GeneralizedEmbeddingExtractor(self.model_wrapper)
@@ -101,7 +98,6 @@ class BaselineTester:
             print(f"\n{'='*50}")
             print(f"Testing {model_type.upper()}")
             print(f"{'='*50}")
-            print(f"[DEBUG] Attempting to load and test model_type: {model_type}")
             try:
                 # Create new tester for each model
                 tester = BaselineTester(model_type, batch_size=self.batch_size, device=self.device)
