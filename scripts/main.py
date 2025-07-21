@@ -106,19 +106,16 @@ def main():
                     print(f"{model_type.upper()}: ERROR - {result['error']}")
                 else:
                     metrics = result['metrics']
-                    print(f"{model_type.upper()}: Accuracy={metrics['accuracy']:.4f}, "
-                          f"Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, "
-                          f"ROC AUC={metrics['roc_auc']:.4f}")
+                    # Print only relevant metrics
+                    metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
+                    print(f"{model_type.upper()}: {metrics_to_print}")
         else:
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
             results_df, metrics = tester.test(args.test_filepath, plot=args.plot)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
-            print(f"Accuracy: {metrics['accuracy']:.4f}")
-            print(f"Precision: {metrics['precision']:.4f}")
-            print(f"Recall: {metrics['recall']:.4f}")
-            print(f"ROC AUC: {metrics['roc_auc']:.4f}")
-            print(f"Optimal threshold: {metrics['threshold']:.4f}")
+            metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
+            print(metrics_to_print)
 
     elif args.mode == 'train':
         # Single training run
@@ -284,12 +281,14 @@ def main():
             **opt_params,
             validate_filepath=args.validate_filepath
         )
-        
-        print(f"\n{args.mode.upper()} Optimization Results:")
-        print(f"Number of trials completed: {len(results)}")
-        if results:
-            best_auc = max(r.get('test_auc', 0) for r in results)
-            best_accuracy = max(r.get('test_accuracy', 0) for r in results)
+        # Only count successful trials (dicts)
+        successful_results = [r for r in results if isinstance(r, dict)]
+        num_trials = len(successful_results)
+        print(f"\nOPTUNA Optimization Results:")
+        print(f"Number of trials completed: {num_trials}")
+        if successful_results:
+            best_auc = max(r.get('test_auc', 0) for r in successful_results)
+            best_accuracy = max(r.get('test_accuracy', 0) for r in successful_results)
             print(f"Best AUC: {best_auc:.4f}")
             print(f"Best Accuracy: {best_accuracy:.4f}")
         print(f"\nAll results saved to: {args.log_dir}")
