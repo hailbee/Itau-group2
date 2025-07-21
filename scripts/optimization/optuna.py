@@ -165,7 +165,9 @@ class OptunaOptimizer(BaseOptimizer):
 
         # After all trials, evaluate the best model on the test set
         import torch, json, os
-        print("[DEBUG] Evaluating best model on test set after all trials...")
+        print("\n" + "="*60)
+        print("[DEBUG] FINAL COMPARISON: Evaluating best model on test set after all Optuna trials...")
+        print("="*60 + "\n")
         best_model_path = os.path.join(self.log_dir, 'best_model.pt')
         best_hparams_path = os.path.join(self.log_dir, 'best_hparams.json')
         
@@ -183,8 +185,28 @@ class OptunaOptimizer(BaseOptimizer):
                 k: (round(v, 4) if isinstance(v, (float, int)) else v)
                 for k, v in test_metrics.items() if k != 'roc_curve'
             }
-            
-            print("[DEBUG] Final test set evaluation:", metrics_to_print)
+
+            # Pretty print key metrics
+            print("\n--- FINAL TEST SET METRICS ---")
+            if 'youden_j' in metrics_to_print:
+                print(f"Youden's J statistic:         {metrics_to_print['youden_j']:.4f}")
+            if 'top_acc_threshold' in metrics_to_print:
+                print(f"Top Accuracy Threshold:       {metrics_to_print['top_acc_threshold']:.4f}")
+            if 'accuracy' in metrics_to_print:
+                print(f"Accuracy:                    {metrics_to_print['accuracy']:.4f}")
+            if 'roc_auc' in metrics_to_print:
+                print(f"ROC AUC:                     {metrics_to_print['roc_auc']:.4f}")
+            if 'f1' in metrics_to_print:
+                print(f"F1 Score:                    {metrics_to_print['f1']:.4f}")
+            if 'precision' in metrics_to_print:
+                print(f"Precision:                   {metrics_to_print['precision']:.4f}")
+            if 'recall' in metrics_to_print:
+                print(f"Recall:                      {metrics_to_print['recall']:.4f}")
+            print("-----------------------------\n")
+            # Print all other metrics
+            for k, v in metrics_to_print.items():
+                if k not in ['youden_j', 'top_acc_threshold', 'accuracy', 'roc_auc', 'f1', 'precision', 'recall']:
+                    print(f"{k}: {v}")
             return test_metrics
         else:
             print("[DEBUG] No best model found for final test set evaluation.")
@@ -198,10 +220,3 @@ class OptunaOptimizer(BaseOptimizer):
             filename = f"{self.log_dir}/optuna_results_{timestamp}.csv"
             df.to_csv(filename, index=False)
             print(f"Results saved to {filename}")
-            
-            # Save study using pickle
-            import pickle
-            study_filename = f"{self.log_dir}/optuna_study_{timestamp}.pkl"
-            with open(study_filename, 'wb') as f:
-                pickle.dump(study, f)
-            print(f"Study saved to {study_filename}")
