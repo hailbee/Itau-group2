@@ -283,7 +283,7 @@ class BaseOptimizer:
                 criterion=criterion,
                 optimizer=optimizer,
                 device=self.device,
-                log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                log_csv_path=None,  # Disable per-trial training log CSV
                 model_type=mode
             )
             evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)

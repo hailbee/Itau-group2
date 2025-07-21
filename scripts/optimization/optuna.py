@@ -174,7 +174,12 @@ class OptunaOptimizer(BaseOptimizer):
         if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
             with open(best_hparams_path, 'r') as f:
                 best_params = json.load(f)
-            print(f"[DEBUG] Initial hyperparameters of best model: {best_params}")
+            # Print best_params with all float/int values rounded to 4 decimals
+            rounded_best_params = {
+                k: (round(v, 4) if isinstance(v, (float, int)) else v)
+                for k, v in best_params.items()
+            }
+            print(f"[DEBUG] Initial hyperparameters of best model: {rounded_best_params}")
             model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
