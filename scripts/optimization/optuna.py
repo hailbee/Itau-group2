@@ -22,7 +22,7 @@ class OptunaOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="optuna_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def objective(self, trial, training_filepath, test_reference_filepath, test_filepath,
+    def objective(self, trial, training_filepath, test_filepath,
                  mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5, validate_filepath=None):
         """
         Objective function for Optuna optimization.
@@ -30,14 +30,12 @@ class OptunaOptimizer(BaseOptimizer):
         Args:
             trial: Optuna trial object
             training_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
             warmup_filepath: Optional warmup data path
             epochs: Number of training epochs
             warmup_epochs: Number of warmup epochs
-            
         Returns:
             float: Objective value (accuracy)
         """
@@ -46,53 +44,44 @@ class OptunaOptimizer(BaseOptimizer):
         batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
         internal_layer_size = trial.suggest_categorical("internal_layer_size", [64, 128, 256, 512])
         
+        params = {}
+        
         if mode in ["supcon", "infonce"]:
             temperature = trial.suggest_float("temperature", 0.01, 1.0, log=True)
             params['temperature'] = temperature
         else:
             margin = trial.suggest_float("margin", 0.2, 1.0)
             params['margin'] = margin
-        
         # Optional: suggest optimizer
         optimizer_name = trial.suggest_categorical("optimizer", ["adam"])
-        
         # Optional: suggest weight decay
         weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
-        
         # Create parameter dictionary
-        params = {
+        params.update({
             'lr': lr,
             'batch_size': batch_size,
             'internal_layer_size': internal_layer_size,
             'optimizer': optimizer_name,
             'weight_decay': weight_decay
-        }
-        
+        })
         try:
-            # Print trial separator
             print(f"\n{'='*50}")
             print(f"Starting Trial {trial.number + 1}")
             print(f"{'='*50}")
-            
-            # Use the base class evaluate_trial method
             result = self.evaluate_trial(
-                params, training_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             
-            # Add trial number to result
             result["trial_number"] = trial.number + 1
-            
-            # Print trial result with better spacing
             print(f"\nTrial {trial.number + 1} completed.")
-            
             return result.get('test_accuracy', 0.0)
-            
+        
         except Exception as e:
             print(f"\nTrial {trial.number + 1} failed with error: {e}")
             return 0.0
     
-    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50, sampler="tpe", 
                 pruner="median", study_name=None, validate_filepath=None):
@@ -101,7 +90,6 @@ class OptunaOptimizer(BaseOptimizer):
         
         Args:
             training_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
@@ -151,7 +139,7 @@ class OptunaOptimizer(BaseOptimizer):
         # Define objective wrapper
         def objective_wrapper(trial):
             return self.objective(
-                trial, training_filepath, test_reference_filepath, test_filepath,
+                trial, training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
         
@@ -173,7 +161,7 @@ class OptunaOptimizer(BaseOptimizer):
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()
-            _, test_metrics = evaluator.evaluate(test_reference_filepath, test_filepath)
+            _, test_metrics = evaluator.evaluate(test_filepath)
             print("[DEBUG] Final test set evaluation:", test_metrics)
             return test_metrics
         else:

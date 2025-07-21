@@ -18,7 +18,7 @@ class BayesianOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="bayesian_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_calls=50, n_random_starts=10, validate_filepath=None):
         """
@@ -26,7 +26,6 @@ class BayesianOptimizer(BaseOptimizer):
         
         Args:
             training_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
@@ -50,7 +49,7 @@ class BayesianOptimizer(BaseOptimizer):
             print(f"{'='*50}")
             
             result = self.evaluate_trial(
-                params, training_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             print(f"\nInitial Sample {i+1} completed.")
@@ -66,7 +65,7 @@ class BayesianOptimizer(BaseOptimizer):
             
             # Evaluate the new point
             result = self.evaluate_trial(
-                next_params, training_filepath, test_reference_filepath, test_filepath,
+                next_params, training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             print(f"\nBayesian Iteration {i+1} completed.")
@@ -86,7 +85,7 @@ class BayesianOptimizer(BaseOptimizer):
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()
-            _, test_metrics = evaluator.evaluate(test_reference_filepath, test_filepath)
+            _, test_metrics = evaluator.evaluate(test_filepath)
             print("[DEBUG] Final test set evaluation:", test_metrics)
             return test_metrics
         else:

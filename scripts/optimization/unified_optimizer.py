@@ -136,7 +136,7 @@ class UnifiedHyperparameterOptimizer:
         
         return new_params
     
-    def optimize(self, method, training_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, method, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None, validate_filepath=None, **kwargs):
         """
         Run hyperparameter optimization using the specified method.
@@ -146,51 +146,51 @@ class UnifiedHyperparameterOptimizer:
             allowed = ["n_calls", "n_random_starts", "epochs", "warmup_epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_bayesian_optimization(
-                training_filepath, test_reference_filepath, test_filepath,
+                training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         elif method == "random":
             allowed = ["n_trials", "epochs", "warmup_epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_random_optimization(
-                training_filepath, test_reference_filepath, test_filepath,
+                training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         elif method == "optuna":
             allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_optuna_optimization(
-                training_filepath, test_reference_filepath, test_filepath,
+                training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
         else:
             raise ValueError(f"Unknown optimization method: {method}")
     
-    def _run_bayesian_optimization(self, training_filepath, test_reference_filepath, test_filepath,
+    def _run_bayesian_optimization(self, training_filepath, test_filepath,
                                  mode, loss_type, warmup_filepath, **kwargs):
         """Run Bayesian optimization."""
         return self.bayesian_optimizer.optimize(
-            training_filepath, test_reference_filepath, test_filepath,
+            training_filepath, test_filepath,
             mode, loss_type, warmup_filepath, **kwargs
         )
     
-    def _run_random_optimization(self, training_filepath, test_reference_filepath, test_filepath,
+    def _run_random_optimization(self, training_filepath, test_filepath,
                                mode, loss_type, warmup_filepath, **kwargs):
         """Run random search optimization."""
         return self.random_optimizer.optimize(
-            training_filepath, test_reference_filepath, test_filepath,
+            training_filepath, test_filepath,
             mode, loss_type, warmup_filepath, **kwargs
         )
     
-    def _run_optuna_optimization(self, training_filepath, test_reference_filepath, test_filepath,
+    def _run_optuna_optimization(self, training_filepath, test_filepath,
                                mode, loss_type, warmup_filepath, **kwargs):
         """Run Optuna optimization."""
         return self.optuna_optimizer.optimize(
-            training_filepath, test_reference_filepath, test_filepath,
+            training_filepath, test_filepath,
             mode, loss_type, warmup_filepath, **kwargs
         )
     
-    def compare_methods(self, training_filepath, test_reference_filepath, test_filepath,
+    def compare_methods(self, training_filepath, test_filepath,
                        mode="pair", loss_type="cosine", warmup_filepath=None, **kwargs):
         """
         Compare different optimization methods on the same problem.
@@ -214,7 +214,7 @@ class UnifiedHyperparameterOptimizer:
                     allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
                 filtered = {k: kwargs[k] for k in allowed if k in kwargs}
                 method_results = self.optimize(
-                    method, training_filepath, test_reference_filepath, test_filepath,
+                    method, training_filepath, test_filepath,
                     mode, loss_type, warmup_filepath, **filtered
                 )
                 results[method] = method_results

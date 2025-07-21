@@ -16,7 +16,7 @@ class RandomOptimizer(BaseOptimizer):
     def __init__(self, model_type, model_name=None, device=None, log_dir="random_optimization_results"):
         super().__init__(model_type, model_name, device, log_dir)
         
-    def optimize(self, training_filepath, test_reference_filepath, test_filepath,
+    def optimize(self, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", warmup_filepath=None,
                 epochs=5, warmup_epochs=5, n_trials=50, validate_filepath=None):
         """
@@ -24,7 +24,6 @@ class RandomOptimizer(BaseOptimizer):
         
         Args:
             training_filepath: Path to training data
-            test_reference_filepath: Path to reference test data
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
@@ -47,7 +46,7 @@ class RandomOptimizer(BaseOptimizer):
             print(f"{'='*50}")
             
             result = self.evaluate_trial(
-                params, training_filepath, test_reference_filepath, test_filepath,
+                params, training_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
             )
             print(f"\nTrial {i+1} completed.")
@@ -67,7 +66,7 @@ class RandomOptimizer(BaseOptimizer):
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()
-            _, test_metrics = evaluator.evaluate(test_reference_filepath, test_filepath)
+            _, test_metrics = evaluator.evaluate(test_filepath)
             print("[DEBUG] Final test set evaluation:", test_metrics)
             return test_metrics
         else:
