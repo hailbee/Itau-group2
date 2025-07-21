@@ -205,7 +205,10 @@ class OptunaOptimizer(BaseOptimizer):
             print("-----------------------------\n")
             # Print all other metrics
             for k, v in metrics_to_print.items():
-                if k not in ['youden_j', 'top_acc_threshold', 'accuracy', 'roc_auc', 'f1', 'precision', 'recall']:
+                if k not in [
+                    'youden_j', 'top_acc_threshold', 'accuracy', 'roc_auc', 'f1', 'precision', 'recall',
+                    'threshold', 'best_accuracy', 'best_accuracy_threshold'
+                ]:
                     print(f"{k}: {v}")
             return test_metrics
         else:

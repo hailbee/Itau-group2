@@ -281,16 +281,6 @@ def main():
             **opt_params,
             validate_filepath=args.validate_filepath
         )
-        
-        # Only count successful trials (dicts)
-        successful_results = [r for r in results if isinstance(r, dict)]
-        print(f"\nOPTUNA Optimization Results:")
-        if successful_results:
-            best_auc = max(r.get('test_auc', 0) for r in successful_results)
-            best_accuracy = max(r.get('test_accuracy', 0) for r in successful_results)
-            print(f"Best AUC: {best_auc:.4f}")
-            print(f"Best Accuracy: {best_accuracy:.4f}")
-        print(f"\nAll results saved to: {args.log_dir}")
 
     elif args.mode == 'compare':
         # Compare different optimization methods
