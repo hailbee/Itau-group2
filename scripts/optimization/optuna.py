@@ -19,7 +19,11 @@ class OptunaOptimizer(BaseOptimizer):
     Provides advanced optimization algorithms and visualization capabilities.
     """
     
-    def __init__(self, model_type, model_name=None, device=None, log_dir="optuna_optimization_results"):
+    def __init__(self, model_type, model_name=None, device=None, log_dir=None):
+        # Hardcode log_dir to Google Drive path
+        log_dir = "/content/drive/My Drive/Project_2_Business_Names/Summer 2025/code/optimizer results"
+        import os
+        os.makedirs(log_dir, exist_ok=True)
         super().__init__(model_type, model_name, device, log_dir)
         
     def objective(self, trial, training_filepath, test_filepath,
