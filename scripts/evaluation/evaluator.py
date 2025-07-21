@@ -4,6 +4,8 @@ import pandas as pd
 from sklearn.metrics import roc_curve, precision_score, recall_score, accuracy_score, roc_auc_score
 from utils.evals import find_best_threshold_youden, plot_roc_curve, plot_confusion_matrix, find_best_threshold_accuracy
 from utils.embeddings import EmbeddingExtractor, SupConEmbeddingExtractor, batched_embedding
+import numpy as np
+from sklearn.metrics import auc
 
 class Evaluator:
     """
@@ -22,23 +24,32 @@ class Evaluator:
             self.extractor = EmbeddingExtractor(model)
 
     def compute_metrics(self, results_df, plot=False):
+        """
+        Compute evaluation metrics from results.
+        Optionally plot ROC curve and confusion matrix.
+        Args:
+            results_df: DataFrame with test results
+            plot (bool): If True, plot ROC curve and confusion matrices. If False, do not plot anything.
+        Returns:
+            dict: Dictionary of metrics
+        """
         y_true = results_df['label']
         y_scores = results_df['max_similarity']
-
-        # Compute ROC curve and find optimal threshold
-        roc_auc, fpr, tpr, thresholds = plot_roc_curve(results_df) if plot else roc_curve(y_true, y_scores)[:3] + (None,)
+        if plot:
+            roc_auc, fpr, tpr, thresholds = plot_roc_curve(results_df)
+        else:
+            fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+            roc_auc = auc(fpr, tpr)
         youden_thresh = find_best_threshold_youden(fpr, tpr, thresholds)
         best_acc, best_acc_threshold = find_best_threshold_accuracy(y_true, y_scores, thresholds if thresholds is not None else np.linspace(0, 1, 100))
         y_pred = (y_scores > youden_thresh).astype(int)
-
-        # Compute metrics
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),
             'precision': precision_score(y_true, y_pred, zero_division=0),
             'recall': recall_score(y_true, y_pred, zero_division=0),
             'threshold': youden_thresh,
             'roc_curve': (fpr, tpr, thresholds),
-            'roc_auc': roc_auc if plot else roc_auc_score(y_true, y_scores),
+            'roc_auc': roc_auc,
             'best_accuracy': best_acc,
             'best_accuracy_threshold': best_acc_threshold
         }

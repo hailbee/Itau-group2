@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--external', action='store_true', default=False,
                       help='If set, evaluate on an external pairwise dataset (no reference set, only test_filepath required)')
     parser.add_argument('--validate_filepath', type=str, default=None, help='Path to validation data file (CSV or Parquet). Used for mid-training and end-of-training validation.')
+    parser.add_argument('--plot', action='store_true', help='If set, plot ROC and confusion matrices during evaluation')
     
     # Grid search parameters
     parser.add_argument('--lrs', type=str, default='[1e-4]',
@@ -111,7 +112,7 @@ def main():
         else:
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_filepath)
+            results_df, metrics = tester.test(args.test_filepath, plot=args.plot)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             print(f"Accuracy: {metrics['accuracy']:.4f}")
             print(f"Precision: {metrics['precision']:.4f}")
@@ -210,7 +211,8 @@ def main():
             warmup_loader=warmup_loader,
             warmup_epochs=args.warmup_epochs,
             curriculum=args.curriculum,
-            validate_filepath=args.validate_filepath
+            validate_filepath=args.validate_filepath,
+            plot=args.plot
         )
 
     elif args.mode == 'grid_search':
