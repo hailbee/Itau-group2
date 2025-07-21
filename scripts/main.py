@@ -281,11 +281,15 @@ def main():
             **opt_params,
             validate_filepath=args.validate_filepath
         )
+        # Debug: print type and content of results
+        print(f"[DEBUG] Type of results: {type(results)}")
+        if isinstance(results, list):
+            print(f"[DEBUG] Results (first 2): {results[:2]}")
+        else:
+            print(f"[DEBUG] Results: {results}")
         # Only count successful trials (dicts)
         successful_results = [r for r in results if isinstance(r, dict)]
-        num_trials = len(successful_results)
         print(f"\nOPTUNA Optimization Results:")
-        print(f"Number of trials completed: {num_trials}")
         if successful_results:
             best_auc = max(r.get('test_auc', 0) for r in successful_results)
             best_accuracy = max(r.get('test_accuracy', 0) for r in successful_results)

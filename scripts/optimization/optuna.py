@@ -169,7 +169,9 @@ class OptunaOptimizer(BaseOptimizer):
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()
             _, test_metrics = evaluator.evaluate(test_filepath)
-            print("[DEBUG] Final test set evaluation:", test_metrics)
+            # Print only relevant metrics (exclude 'roc_curve')
+            metrics_to_print = {k: v for k, v in test_metrics.items() if k != 'roc_curve'}
+            print("[DEBUG] Final test set evaluation:", metrics_to_print)
             return test_metrics
         else:
             print("[DEBUG] No best model found for final test set evaluation.")
