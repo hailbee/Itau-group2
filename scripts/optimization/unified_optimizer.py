@@ -7,7 +7,6 @@ from datetime import datetime
 from scripts.optimization.bayesian import BayesianOptimizer
 from scripts.optimization.random_optimizer import RandomOptimizer
 from scripts.optimization.optuna import OptunaOptimizer
-from scripts.optimization.pbt import PopulationBasedTrainer
 from scripts.training.trainer import Trainer
 from scripts.evaluation.evaluator import Evaluator
 
@@ -33,7 +32,6 @@ class UnifiedHyperparameterOptimizer:
         self.bayesian_optimizer = BayesianOptimizer(model_type, model_name, device, f"{log_dir}/bayesian")
         self.random_optimizer = RandomOptimizer(model_type, model_name, device, f"{log_dir}/random")
         self.optuna_optimizer = OptunaOptimizer(model_type, model_name, device, f"{log_dir}/optuna")
-        self.pbt_optimizer = PopulationBasedTrainer(model_type, model_name, device, f"{log_dir}/pbt")
     
     def sample_initial_hyperparameters(self, mode, population_size):
         """
@@ -165,13 +163,6 @@ class UnifiedHyperparameterOptimizer:
                 training_filepath, test_reference_filepath, test_filepath,
                 mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
             )
-        elif method == "pbt":
-            allowed = ["population_size", "generations", "epochs_per_generation", "warmup_epochs", "evolution_frequency"]
-            filtered = {k: kwargs[k] for k in allowed if k in kwargs}
-            return self._run_pbt_optimization(
-                training_filepath, test_reference_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, validate_filepath=validate_filepath, **filtered
-            )
         else:
             raise ValueError(f"Unknown optimization method: {method}")
     
@@ -199,14 +190,6 @@ class UnifiedHyperparameterOptimizer:
             mode, loss_type, warmup_filepath, **kwargs
         )
     
-    def _run_pbt_optimization(self, training_filepath, test_reference_filepath, test_filepath,
-                            mode, loss_type, warmup_filepath, **kwargs):
-        """Run PBT optimization."""
-        return self.pbt_optimizer.optimize(
-            training_filepath, test_reference_filepath, test_filepath,
-            mode, loss_type, warmup_filepath, **kwargs
-        )
-    
     def compare_methods(self, training_filepath, test_reference_filepath, test_filepath,
                        mode="pair", loss_type="cosine", warmup_filepath=None, **kwargs):
         """
@@ -215,7 +198,7 @@ class UnifiedHyperparameterOptimizer:
         print(f"Comparing optimization methods for {self.model_type} model")
         print(f"Mode: {mode}, Loss: {loss_type}")
         
-        methods = ["random", "bayesian", "optuna", "pbt"]
+        methods = ["random", "bayesian", "optuna"]
         results = {}
         for method in methods:
             print(f"\n{'='*50}")
@@ -229,8 +212,6 @@ class UnifiedHyperparameterOptimizer:
                     allowed = ["n_trials", "epochs", "warmup_epochs"]
                 elif method == "optuna":
                     allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs", "warmup_epochs"]
-                elif method == "pbt":
-                    allowed = ["population_size", "generations", "epochs_per_generation", "warmup_epochs", "evolution_frequency"]
                 filtered = {k: kwargs[k] for k in allowed if k in kwargs}
                 method_results = self.optimize(
                     method, training_filepath, test_reference_filepath, test_filepath,

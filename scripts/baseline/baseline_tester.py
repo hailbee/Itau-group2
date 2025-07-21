@@ -34,7 +34,7 @@ class BaselineTester:
         Initialize baseline tester with specified model.
         
         Args:
-            model_type: One of 'clip', 'coca', 'flava', 'siglip', 'openclip'
+            model_type: One of 'clip', 'coca', 'flava', 'siglip'
             model_name: Specific model name (optional, uses default if not provided)
             batch_size: Batch size for processing
             device: Device to run on (auto-detected if None)

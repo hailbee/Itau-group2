@@ -13,9 +13,9 @@ from model_utils.models.learning.infonce import SiameseModelInfoNCE
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
     parser.add_argument('--mode', type=str, 
-                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'pbt', 'compare', 'baseline'], 
+                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline'], 
                       required=True,
-                      help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
+                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, or baseline (supports multiple vision-language models)')
     parser.add_argument('--training_filepath', type=str,
                       help='Path to training data (for training modes)')
     parser.add_argument('--test_filepath', type=str, required=True,
@@ -24,9 +24,9 @@ def main():
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
                       help='Loss function type')
-    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'openclip', 'all'], default='clip',
+    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'all'], default='clip',
                       help='Baseline model to test (for baseline mode)')
-    parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip', 'openclip'], default='clip',
+    parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip'], default='clip',
                       help='Vision-language backbone to use (clip, siglip, flava, etc.)')
     parser.add_argument('--batch_size', type=int, default=32,
                       help='Batch size for processing')
@@ -65,14 +65,6 @@ def main():
                       help='Number of calls for Bayesian optimization')
     parser.add_argument('--n_random_starts', type=int, default=10,
                       help='Number of random starts for Bayesian optimization')
-    parser.add_argument('--population_size', type=int, default=8,
-                      help='Population size for PBT')
-    parser.add_argument('--generations', type=int, default=10,
-                      help='Number of generations for PBT')
-    parser.add_argument('--epochs_per_generation', type=int, default=5,
-                      help='Epochs per generation for PBT')
-    parser.add_argument('--evolution_frequency', type=int, default=2,
-                      help='Evolution frequency for PBT')
     parser.add_argument('--sampler', type=str, choices=['tpe', 'random', 'cmaes'], default='tpe',
                       help='Sampler for Optuna optimization')
     parser.add_argument('--pruner', type=str, choices=['median', 'hyperband', 'none'], default='median',
@@ -264,7 +256,7 @@ def main():
         print(f"Best configuration: {best_config}")
         print("\nAll results saved to:", args.log_dir)
 
-    elif args.mode in ['bayesian', 'random', 'optuna', 'pbt']:
+    elif args.mode in ['bayesian', 'random', 'optuna']:
         # Advanced hyperparameter optimization
         optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=device, log_dir=args.log_dir)
         
@@ -273,10 +265,6 @@ def main():
             'n_trials': args.n_trials,
             'n_calls': args.n_calls,
             'n_random_starts': args.n_random_starts,
-            'population_size': args.population_size,
-            'generations': args.generations,
-            'epochs_per_generation': args.epochs_per_generation,
-            'evolution_frequency': args.evolution_frequency,
             'sampler': args.sampler,
             'pruner': args.pruner if args.pruner != 'none' else None,
             'study_name': args.study_name,
@@ -333,5 +321,3 @@ def main():
 
 if __name__ == '__main__':
     main() 
-
-# Making a small change to the code

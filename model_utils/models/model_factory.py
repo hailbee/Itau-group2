@@ -3,7 +3,6 @@ from .wrappers import (
     CoCaModelWrapper,
     FLAVAModelWrapper,
     SigLIPModelWrapper,
-    OpenCLIPModelWrapper
 )
 
 class ModelFactory:
@@ -25,10 +24,6 @@ class ModelFactory:
         'siglip': {
             'class': SigLIPModelWrapper,
             'default_name': 'google/siglip-base-patch16-224'
-        },
-        'openclip': {
-            'class': OpenCLIPModelWrapper,
-            'default_name': 'ViT-L-14'
         }
     }
     
@@ -38,7 +33,7 @@ class ModelFactory:
         Create a model wrapper of the specified type.
         
         Args:
-            model_type: One of 'clip', 'coca', 'flava', 'siglip', 'openclip'
+            model_type: One of 'clip', 'coca', 'flava', 'siglip'
             model_name: Specific model name (optional, uses default if not provided)
             device: Device to run on (auto-detected if None)
             
@@ -64,11 +59,6 @@ class ModelFactory:
                 raise ImportError(
                     f"Failed to create {model_type} model: {str(e)}\n"
                     "Please install required dependencies: pip install sentencepiece==0.2.0"
-                )
-            elif model_type == 'openclip':
-                raise ImportError(
-                    f"Failed to create {model_type} model: {str(e)}\n"
-                    "Please install required dependencies: pip install open_clip_torch"
                 )
             else:
                 raise ImportError(f"Failed to create {model_type} model: {str(e)}")
