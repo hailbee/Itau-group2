@@ -281,12 +281,7 @@ def main():
             **opt_params,
             validate_filepath=args.validate_filepath
         )
-        # Debug: print type and content of results
-        print(f"[DEBUG] Type of results: {type(results)}")
-        if isinstance(results, list):
-            print(f"[DEBUG] Results (first 2): {results[:2]}")
-        else:
-            print(f"[DEBUG] Results: {results}")
+        
         # Only count successful trials (dicts)
         successful_results = [r for r in results if isinstance(r, dict)]
         print(f"\nOPTUNA Optimization Results:")

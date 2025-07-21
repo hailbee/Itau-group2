@@ -52,10 +52,13 @@ class OptunaOptimizer(BaseOptimizer):
         else:
             margin = trial.suggest_float("margin", 0.2, 1.0)
             params['margin'] = margin
+        
         # Optional: suggest optimizer
         optimizer_name = trial.suggest_categorical("optimizer", ["adam"])
+       
         # Optional: suggest weight decay
         weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+        
         # Create parameter dictionary
         params.update({
             'lr': lr,
@@ -161,16 +164,22 @@ class OptunaOptimizer(BaseOptimizer):
         print("[DEBUG] Evaluating best model on test set after all trials...")
         best_model_path = os.path.join(self.log_dir, 'best_model.pt')
         best_hparams_path = os.path.join(self.log_dir, 'best_hparams.json')
+        
         if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
             with open(best_hparams_path, 'r') as f:
                 best_params = json.load(f)
+            print(f"[DEBUG] Initial hyperparameters of best model: {best_params}")
             model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()
             _, test_metrics = evaluator.evaluate(test_filepath)
-            # Print only relevant metrics (exclude 'roc_curve')
-            metrics_to_print = {k: v for k, v in test_metrics.items() if k != 'roc_curve'}
+            # Print only relevant metrics (exclude 'roc_curve'), rounded to 4 decimals
+            metrics_to_print = {
+                k: (round(v, 4) if isinstance(v, (float, int)) else v)
+                for k, v in test_metrics.items() if k != 'roc_curve'
+            }
+            
             print("[DEBUG] Final test set evaluation:", metrics_to_print)
             return test_metrics
         else:
