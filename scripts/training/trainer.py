@@ -84,98 +84,84 @@ class Trainer:
         val_metrics_at_halfway = None
         halfway_epoch = (epochs - 1) // 2
 
-        with open(self.log_csv_path, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(["Epoch", "Loss", "Accuracy", "Precision", "Recall", "AUC", "Val_Accuracy", "Val_Precision", "Val_Recall", "Val_AUC"])
+        for epoch in range(epochs):
 
-            for epoch in range(epochs):
+            if curriculum == "self" and warmup_loader is not None:
+                hard_ratio = min(0.1 * epoch, 1.0)
+                easy_ratio = 1.0 - hard_ratio
 
-                if curriculum == "self" and warmup_loader is not None:
-                    hard_ratio = min(0.1 * epoch, 1.0)
-                    easy_ratio = 1.0 - hard_ratio
+                total_samples = len(dataloader.dataset)
+                num_easy = int(total_samples * easy_ratio)
+                num_hard = total_samples - num_easy
 
-                    total_samples = len(dataloader.dataset)
-                    num_easy = int(total_samples * easy_ratio)
-                    num_hard = total_samples - num_easy
+                easy_indices = np.random.choice(len(warmup_loader.dataset), num_easy, replace=False)
+                hard_indices = np.random.choice(len(dataloader.dataset), num_hard, replace=False)
 
-                    easy_indices = np.random.choice(len(warmup_loader.dataset), num_easy, replace=False)
-                    hard_indices = np.random.choice(len(dataloader.dataset), num_hard, replace=False)
-
-                    mixed_dataset = ConcatDataset([
-                        Subset(warmup_loader.dataset, easy_indices),
-                        Subset(dataloader.dataset, hard_indices)
-                    ])
-
-                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
-
-                elif curriculum == "bandit" and warmup_loader is not None:
-                    epsilon = 0.1
-                    reward_window = 5
-
-                    # Bandit curriculum learning
-                    # For simplicity, use a local rewards dict
-                    rewards = {"easy": [], "hard": []}
-
-                    if random.random() < epsilon:
-                        chosen_dataset_name = random.choice(["easy", "hard"])
-                    else:
-                        avg_rewards = {
-                            k: np.mean(v[-reward_window:]) if v else 0.0
-                            for k, v in rewards.items()
-                        }
-                        chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
-
-                    easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
-                    hard_batch_size = dataloader.batch_size - easy_batch_size
-
-                    easy_indices = np.random.choice(len(warmup_loader.dataset), easy_batch_size, replace=False)
-                    hard_indices = np.random.choice(len(dataloader.dataset), hard_batch_size, replace=False)
-
-                    mixed_dataset = ConcatDataset([
-                        Subset(warmup_loader.dataset, easy_indices),
-                        Subset(dataloader.dataset, hard_indices)
-                    ])
-
-                    current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
-                    mix_desc = f"bandit (chose {chosen_dataset_name})"
-                    print(mix_desc)
-
-                else:
-                    current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
-
-                avg_loss = self.train_epoch(current_loader, mode)
-                print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
-
-                if avg_loss < best_epoch_loss:
-                    best_epoch_loss = avg_loss
-
-                val_metrics = None
-                if validate_filepath is not None and (epoch == halfway_epoch or epoch == epochs - 1):
-                    print(f"[DEBUG] Evaluating on validation set at epoch {epoch+1}")
-                    val_metrics = self.evaluator.evaluate(validate_filepath)[1]
-
-                    if epoch == halfway_epoch:
-                        val_metrics_at_halfway = val_metrics
-
-                    if best_val_metrics is None or (val_metrics and val_metrics.get('roc_auc', 0) > best_val_metrics.get('roc_auc', 0)):
-                        best_val_metrics = val_metrics
-                        best_val_epoch = epoch + 1
-
-                writer.writerow([
-                    epoch + 1, 
-                    avg_loss, 
-                    '', '', '', '',
-                    val_metrics['accuracy'] if val_metrics else '',
-                    val_metrics['precision'] if val_metrics else '',
-                    val_metrics['recall'] if val_metrics else '',
-                    val_metrics['roc_auc'] if val_metrics else ''
+                mixed_dataset = ConcatDataset([
+                    Subset(warmup_loader.dataset, easy_indices),
+                    Subset(dataloader.dataset, hard_indices)
                 ])
 
-                if val_metrics:
-                    print(f"Epoch {epoch+1} - Val Accuracy: {val_metrics['accuracy']:.4f} | "
-                          f"Precision: {val_metrics['precision']:.4f} | "
-                          f"Recall: {val_metrics['recall']:.4f} | "
-                          f"AUC: {val_metrics['roc_auc']:.4f}")
+                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+
+            elif curriculum == "bandit" and warmup_loader is not None:
+                epsilon = 0.1
+                reward_window = 5
+
+                # Bandit curriculum learning
+                # For simplicity, use a local rewards dict
+                rewards = {"easy": [], "hard": []}
+
+                if random.random() < epsilon:
+                    chosen_dataset_name = random.choice(["easy", "hard"])
+                else:
+                    avg_rewards = {
+                        k: np.mean(v[-reward_window:]) if v else 0.0
+                        for k, v in rewards.items()
+                    }
+                    chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
+
+                easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
+                hard_batch_size = dataloader.batch_size - easy_batch_size
+
+                easy_indices = np.random.choice(len(warmup_loader.dataset), easy_batch_size, replace=False)
+                hard_indices = np.random.choice(len(dataloader.dataset), hard_batch_size, replace=False)
+
+                mixed_dataset = ConcatDataset([
+                    Subset(warmup_loader.dataset, easy_indices),
+                    Subset(dataloader.dataset, hard_indices)
+                ])
+
+                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                mix_desc = f"bandit (chose {chosen_dataset_name})"
+                print(mix_desc)
+
+            else:
+                current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
+
+            avg_loss = self.train_epoch(current_loader, mode)
+            print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
+
+            if avg_loss < best_epoch_loss:
+                best_epoch_loss = avg_loss
+
+            val_metrics = None
+            if validate_filepath is not None and (epoch == halfway_epoch or epoch == epochs - 1):
+                print(f"[DEBUG] Evaluating on validation set at epoch {epoch+1}")
+                val_metrics = self.evaluator.evaluate(validate_filepath)[1]
+
+                if epoch == halfway_epoch:
+                    val_metrics_at_halfway = val_metrics
+
+                if best_val_metrics is None or (val_metrics and val_metrics.get('roc_auc', 0) > best_val_metrics.get('roc_auc', 0)):
+                    best_val_metrics = val_metrics
+                    best_val_epoch = epoch + 1
+
+            if val_metrics:
+                print(f"Epoch {epoch+1} - Val Accuracy: {val_metrics['accuracy']:.4f} | "
+                        f"Precision: {val_metrics['precision']:.4f} | "
+                        f"Recall: {val_metrics['recall']:.4f} | "
+                        f"AUC: {val_metrics['roc_auc']:.4f}")
 
         print("\n=== Best Epochs Summary ===")
         for metric in ['accuracy', 'precision', 'recall', 'roc_auc']:
