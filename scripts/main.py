@@ -18,10 +18,8 @@ def main():
                       help='Mode to run: train, grid_search, bayesian, random, optuna, pbt, compare, or baseline (supports multiple vision-language models)')
     parser.add_argument('--training_filepath', type=str,
                       help='Path to training data (for training modes)')
-    parser.add_argument('--test_reference_filepath', type=str,
-                      help='Path to reference data for evaluation (CSV with normalized_company)')
     parser.add_argument('--test_filepath', type=str, required=True,
-                      help='Path to test data. If test_reference_filepath is provided, this should be a test set (CSV with company, label). If not, this should be a pairwise file (CSV/PKL with fraudulent_name, real_name, label).')
+                      help='Path to test data (CSV or Parquet with fraudulent_name, real_name, label)')
     parser.add_argument('--model_type', type=str, choices=['pair', 'triplet', 'supcon', 'infonce'], default='pair',
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
@@ -104,11 +102,11 @@ def main():
 
     if args.mode == 'baseline':
         from scripts.baseline.baseline_tester import BaselineTester
-        # Test baseline model(s) performance
+        # Test baseline model(s) performance (pairwise only)
         if args.baseline_model == 'all':
             print("Testing all available baseline models...")
             tester = BaselineTester(model_type='clip', batch_size=args.batch_size, device=device)
-            all_results = tester.test_all_models(args.test_reference_filepath, args.test_filepath)
+            all_results = tester.test_all_models(args.test_filepath)
             print("\nBaseline Results Summary:")
             for model_type, result in all_results.items():
                 if 'error' in result:
@@ -121,7 +119,7 @@ def main():
         else:
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_reference_filepath, args.test_filepath)
+            results_df, metrics = tester.test(args.test_filepath)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             print(f"Accuracy: {metrics['accuracy']:.4f}")
             print(f"Precision: {metrics['precision']:.4f}")
@@ -214,7 +212,6 @@ def main():
         trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
         trainer.train(
             dataloader=dataloader,
-            test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
             epochs=args.epochs,
@@ -248,7 +245,6 @@ def main():
         
         best_config, results_df = searcher.search(
             training_filepath=args.training_filepath,
-            test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             lrs=lrs,
             batch_sizes=batch_sizes,
@@ -291,7 +287,6 @@ def main():
         results = optimizer.optimize(
             method=args.mode,
             training_filepath=args.training_filepath,
-            test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
             loss_type=args.loss_type,
@@ -326,7 +321,6 @@ def main():
         
         results = optimizer.compare_methods(
             training_filepath=args.training_filepath,
-            test_reference_filepath=args.test_reference_filepath,
             test_filepath=args.test_filepath,
             mode=args.model_type,
             loss_type=args.loss_type,

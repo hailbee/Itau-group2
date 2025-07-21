@@ -25,7 +25,7 @@ class GeneralizedEmbeddingExtractor(nn.Module):
 
 class BaselineTester:
     """
-    Generalized interface for testing multiple vision-language model baselines.
+    Generalized interface for testing multiple vision-language model baselines (pairwise evaluation only).
     Uses the ModelFactory for cleaner model management.
     """
     
@@ -43,7 +43,6 @@ class BaselineTester:
         self.batch_size = batch_size
         self.model_type = model_type
 
-
         # Use ModelFactory to create the model wrapper
         try:
             self.model_wrapper = ModelFactory.create_model(
@@ -59,21 +58,16 @@ class BaselineTester:
         """Encode texts using the selected model."""
         return self.model_wrapper.encode_text(texts)
 
-    def test(self, test_reference_filepath, test_filepath):
+    def test(self, test_filepath):
         """
-        Test the selected model performance.
+        Test the selected model performance using pairwise evaluation.
         Args:
-            test_reference_filepath: Path to reference data for evaluation (or None for pairwise mode)
-            test_filepath: Path to test data
+            test_filepath: Path to test data (CSV or Parquet with fraudulent_name, real_name, label)
         Returns:
             tuple: (results_df, metrics)
         """
-        if test_reference_filepath is not None:
-            print(f"Testing {self.model_type.upper()} model (reference/test mode)...")
-            results_df, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
-        else:
-            print(f"Testing {self.model_type.upper()} model (pairwise mode)...")
-            results_df, metrics = self.evaluator.test_pairs(test_filepath)
+        print(f"Testing {self.model_type.upper()} model (pairwise mode)...")
+        results_df, metrics = self.evaluator.evaluate(test_filepath)
         print(f"\n{self.model_type.upper()} Performance:")
         print(f"Accuracy: {metrics['accuracy']:.4f}")
         print(f"Precision: {metrics['precision']:.4f}")
@@ -82,12 +76,11 @@ class BaselineTester:
         print(f"Optimal threshold: {metrics['threshold']:.4f}")
         return results_df, metrics
     
-    def test_all_models(self, test_reference_filepath, test_filepath):
+    def test_all_models(self, test_filepath):
         """
-        Test all available models and compare their performance.
+        Test all available models and compare their performance (pairwise evaluation only).
         Args:
-            test_reference_filepath: Path to reference data for evaluation (or None for pairwise mode)
-            test_filepath: Path to test data
+            test_filepath: Path to test data (CSV or Parquet with fraudulent_name, real_name, label)
         Returns:
             dict: Dictionary with results for each model
         """
@@ -101,7 +94,7 @@ class BaselineTester:
             try:
                 # Create new tester for each model
                 tester = BaselineTester(model_type, batch_size=self.batch_size, device=self.device)
-                results_df, metrics = tester.test(test_reference_filepath, test_filepath)
+                results_df, metrics = tester.test(test_filepath)
                 all_results[model_type] = {
                     'results_df': results_df,
                     'metrics': metrics

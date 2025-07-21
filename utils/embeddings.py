@@ -42,12 +42,3 @@ def batched_embedding(extractor, names, batch_size=32):
             embeddings.append(emb)
     return torch.cat(embeddings, dim=0)
 
-def get_clip_embeddings(texts, batch_size=32):
-    all_embeddings = []
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i+batch_size]
-        inputs = clip_tokenizer(batch, return_tensors="pt", padding=True, truncation=True).to(clip_model.device)
-        outputs = clip_model.get_text_features(**inputs)
-        normed = F.normalize(outputs, dim=1)
-        all_embeddings.append(normed)
-    return torch.cat(all_embeddings, dim=0)

@@ -52,14 +52,14 @@ class Trainer:
         return epoch_loss / len(dataloader)
 
 
-    def evaluate(self, test_reference_filepath, test_filepath):
-        """Evaluate model on test set"""
+    def evaluate(self, test_filepath):
+        """Evaluate model on test set (pairwise only)"""
         self.model.eval()
-        _, metrics = self.evaluator.evaluate(test_reference_filepath, test_filepath)
+        _, metrics = self.evaluator.evaluate(test_filepath)
         return metrics
 
 
-    def train(self, dataloader, test_reference_filepath, test_filepath, 
+    def train(self, dataloader, test_filepath, 
              mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None, validate_filepath=None):
         """
         Main training loop with optional warmup and validation.
@@ -152,7 +152,7 @@ class Trainer:
                 val_metrics = None
                 if validate_filepath is not None and (epoch == halfway_epoch or epoch == epochs - 1):
                     print(f"[DEBUG] Evaluating on validation set at epoch {epoch+1}")
-                    val_metrics = self.evaluator.evaluate(None, validate_filepath)[1]
+                    val_metrics = self.evaluator.evaluate(validate_filepath)[1]
 
                     if epoch == halfway_epoch:
                         val_metrics_at_halfway = val_metrics
