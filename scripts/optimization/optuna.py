@@ -69,8 +69,15 @@ class OptunaOptimizer(BaseOptimizer):
             print(f"Starting Trial {trial.number + 1}")
             print(f"{'='*50}")
             result = self.evaluate_trial(
-                params, training_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
+                params,
+                training_filepath=training_filepath,
+                test_filepath=test_filepath,
+                mode=mode,
+                loss_type=loss_type,
+                warmup_filepath=warmup_filepath,
+                epochs=epochs,
+                warmup_epochs=warmup_epochs,
+                validate_filepath=validate_filepath
             )
             
             result["trial_number"] = trial.number + 1
