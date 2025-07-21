@@ -217,8 +217,7 @@ class BaseOptimizer:
         """
         return self.sample_hyperparameters(mode, n_samples)
     
-    def evaluate_trial(self, params, training_filepath, test_reference_filepath,
-                      test_filepath, mode, loss_type, warmup_filepath=None,
+    def evaluate_trial(self, params, training_filepath, test_filepath, mode, loss_type, warmup_filepath=None,
                       epochs=5, warmup_epochs=5, validate_filepath=None, save_best_model=True):
         """
         Evaluate a single hyperparameter configuration.
@@ -292,7 +291,6 @@ class BaseOptimizer:
             # Train model, pass validate_filepath
             best_metrics = trainer.train(
                 dataloader=dataloader,
-                test_reference_filepath=test_reference_filepath,
                 test_filepath=test_filepath,
                 mode=mode,
                 epochs=epochs,
