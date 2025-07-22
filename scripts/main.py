@@ -116,6 +116,29 @@ def main():
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
             print(metrics_to_print)
+    elif args.mode == 'evaluate_saved':
+        print("Loading saved model for evaluation...")
+        # Load backbone
+        from scripts.baseline.baseline_tester import BaselineTester
+        tester = BaselineTester(model_type=args.backbone, batch_size=1, device=device)
+        backbone_module = tester.model_wrapper  # must have .encode_text
+        
+        # Load your model with matching dimensions
+        model = SiameseModelPairs(embedding_dim=768, projection_dim=512, backbone=backbone_module).to(device)
+
+        # Load saved weights
+        state_dict = torch.load(args.log_dir + "/best_model.pt", map_location=device)
+        model.load_state_dict(state_dict)
+        model.eval()
+
+        # Evaluate
+        evaluator = Evaluator(model, batch_size=args.batch_size, model_type=args.model_type)
+        results_df, metrics = evaluator.evaluate(args.test_filepath, plot=args.plot)
+
+        print("\n Evaluation complete. Results:")
+        for k, v in metrics.items():
+            if k != 'roc_curve':
+                print(f"{k}: {v}")
 
     elif args.mode == 'train':
         # Single training run
