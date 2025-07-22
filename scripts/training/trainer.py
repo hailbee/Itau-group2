@@ -1,8 +1,10 @@
 import csv
 import random
 import numpy as np
+import torch
 from torch.utils.data import DataLoader, Subset, ConcatDataset
 from scripts.evaluation.evaluator import Evaluator
+from utils.curriculum import get_curriculum_ratios
 
 
 class Trainer:
@@ -22,10 +24,12 @@ class Trainer:
         self.evaluator = Evaluator(model, model_type=model_type)
 
 
-    def train_epoch(self, dataloader, mode="pair"):
+    def train_epoch(self, dataloader, mode="pair", track_pg = False):
         """Train for one epoch"""
         self.model.train()
         epoch_loss = 0.0
+        total_pg = 0
+        pg_count = 0
 
         for i, batch in enumerate(dataloader):
             if mode == "triplet":
@@ -44,12 +48,21 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+
+            if track_pg:
+                with torch.no_grad():
+                    outputs_after = self.model(*batch)
+                    loss_after = self.criterion(*outputs_after)
+                    total_pg += (loss.item() - loss_after.item())
+                    pg_count += 1
+
             epoch_loss += loss.item()
 
             if i % 100 == 0:
                 print(f"Step {i} complete out of {len(dataloader)}")
 
-        return epoch_loss / len(dataloader)
+        avg_pg = total_pg/pg_count if track_pg and pg_count > 0 else None
+        return epoch_loss / len(dataloader), avg_pg
 
 
     def evaluate(self, test_filepath):
@@ -60,7 +73,7 @@ class Trainer:
 
 
     def train(self, dataloader, test_filepath, 
-             mode="pair", epochs=30, warmup_loader=None, warmup_epochs=5, curriculum = None, validate_filepath=None):
+             mode="pair", epochs=30, medium_loader=None, easy_loader=None, curriculum = None, validate_filepath=None):
         """
         Main training loop with optional warmup and validation.
         """
@@ -84,66 +97,80 @@ class Trainer:
         val_metrics_at_halfway = None
         halfway_epoch = (epochs - 1) // 2
 
+        if medium_loader is not None and easy_loader is not None:
+            datasets = {
+                "easy": easy_loader.dataset,
+                "medium": medium_loader.dataset,
+                "hard": dataloader.dataset
+            }
+            
+            rewards = {k: [] for k in datasets}
+        else:
+            datasets = {}
+            rewards = {}
+
         for epoch in range(epochs):
 
-            if curriculum == "self" and warmup_loader is not None:
-                hard_ratio = min(0.1 * epoch, 1.0)
-                easy_ratio = 1.0 - hard_ratio
+            if curriculum == "self" and medium_loader is not None and easy_loader is not None:
+                # new ratios for three dataset
+                ratios = get_curriculum_ratios(epoch, epochs)
 
                 total_samples = len(dataloader.dataset)
-                num_easy = int(total_samples * easy_ratio)
-                num_hard = total_samples - num_easy
+                easy_n = int(ratios["easy"] * total_samples)
+                medium_n = int(ratios["medium"] * total_samples)
+                hard_n = int(ratios["hard"] * total_samples)
 
-                easy_indices = np.random.choice(len(warmup_loader.dataset), num_easy, replace=False)
-                hard_indices = np.random.choice(len(dataloader.dataset), num_hard, replace=False)
+                easy_idx = np.random.choice(len(easy_loader.dataset), easy_n, replace=False)
+                med_idx = np.random.choice(len(medium_loader.dataset), medium_n, replace=False)
+                hard_idx = np.random.choice(len(dataloader.dataset), hard_n, replace=False)
 
                 mixed_dataset = ConcatDataset([
-                    Subset(warmup_loader.dataset, easy_indices),
-                    Subset(dataloader.dataset, hard_indices)
+                    Subset(easy_loader.dataset, easy_idx),
+                    Subset(medium_loader.dataset, med_idx),
+                    Subset(dataloader.dataset, hard_idx)
                 ])
 
                 current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
 
-            elif curriculum == "bandit" and warmup_loader is not None:
+            elif curriculum == "bandit" and medium_loader is not None and easy_loader is not None:
                 epsilon = 0.1
-                reward_window = 5
+                reward_window = 3
 
                 # Bandit curriculum learning
                 # For simplicity, use a local rewards dict
-                rewards = {"easy": [], "hard": []}
+                avg_rewards = {
+                    k: np.mean(v[-reward_window:]) if v else 0.0
+                    for k, v in rewards.items()
+                }
 
                 if random.random() < epsilon:
-                    chosen_dataset_name = random.choice(["easy", "hard"])
+                    chosen = random.choice(list(datasets.keys()))
                 else:
-                    avg_rewards = {
-                        k: np.mean(v[-reward_window:]) if v else 0.0
-                        for k, v in rewards.items()
-                    }
-                    chosen_dataset_name = max(avg_rewards, key=avg_rewards.get)
+                   chosen = max(avg_rewards, key=avg_rewards.get)
 
-                easy_batch_size = dataloader.batch_size // 2 if chosen_dataset_name == "hard" else dataloader.batch_size
-                hard_batch_size = dataloader.batch_size - easy_batch_size
-
-                easy_indices = np.random.choice(len(warmup_loader.dataset), easy_batch_size, replace=False)
-                hard_indices = np.random.choice(len(dataloader.dataset), hard_batch_size, replace=False)
-
-                mixed_dataset = ConcatDataset([
-                    Subset(warmup_loader.dataset, easy_indices),
-                    Subset(dataloader.dataset, hard_indices)
-                ])
-
-                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
-                mix_desc = f"bandit (chose {chosen_dataset_name})"
-                print(mix_desc)
-
+                current_loader = DataLoader(
+                    datasets[chosen],
+                    batch_size=dataloader.batch_size,
+                    shuffle=True
+                )
+            
             else:
-                current_loader = warmup_loader if warmup_loader and epoch < warmup_epochs else dataloader
+                phase_len = epochs // 3
+                if epoch < phase_len and easy_loader:
+                    current_loader = easy_loader
+                elif epoch < 2 * phase_len and medium_loader:
+                    current_loader = medium_loader
+                else:
+                    current_loader = dataloader
 
-            avg_loss = self.train_epoch(current_loader, mode)
+            avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
             print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
 
             if avg_loss < best_epoch_loss:
                 best_epoch_loss = avg_loss
+            
+            if curriculum == "bandit" and avg_pg is not None and easy_loader is not None and medium_loader is not None:
+                rewards[chosen].append(avg_pg)
 
             val_metrics = None
             if validate_filepath is not None and (epoch == halfway_epoch or epoch == epochs - 1):

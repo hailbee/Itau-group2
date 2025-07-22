@@ -19,8 +19,8 @@ class BayesianOptimizer(BaseOptimizer):
         super().__init__(model_type, model_name, device, log_dir)
         
     def optimize(self, training_filepath, test_filepath,
-                mode="pair", loss_type="cosine", warmup_filepath=None,
-                epochs=5, warmup_epochs=5, n_calls=50, n_random_starts=10, validate_filepath=None):
+                mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None,
+                epochs=5, n_calls=50, n_random_starts=10, validate_filepath=None):
         """
         Run Bayesian optimization.
         
@@ -29,9 +29,7 @@ class BayesianOptimizer(BaseOptimizer):
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
             epochs: Number of training epochs per trial
-            warmup_epochs: Number of warmup epochs
             n_calls: Number of optimization iterations
             n_random_starts: Number of random initial points
         """
@@ -54,9 +52,9 @@ class BayesianOptimizer(BaseOptimizer):
                 test_filepath=test_filepath,
                 mode=mode,
                 loss_type=loss_type,
-                warmup_filepath=warmup_filepath,
+                medium_filepath=medium_filepath,
                 epochs=epochs,
-                warmup_epochs=warmup_epochs,
+                easy_filepath=easy_filepath,
                 validate_filepath=validate_filepath
             )
             print(f"\nInitial Sample {i+1} completed.")
@@ -77,9 +75,9 @@ class BayesianOptimizer(BaseOptimizer):
                 test_filepath=test_filepath,
                 mode=mode,
                 loss_type=loss_type,
-                warmup_filepath=warmup_filepath,
+                medium_filepath=medium_filepath,
                 epochs=epochs,
-                warmup_epochs=warmup_epochs,
+                easy_filepath=easy_filepath,
                 validate_filepath=validate_filepath
             )
             print(f"\nBayesian Iteration {i+1} completed.")

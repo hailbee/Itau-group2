@@ -17,8 +17,8 @@ class RandomOptimizer(BaseOptimizer):
         super().__init__(model_type, model_name, device, log_dir)
         
     def optimize(self, training_filepath, test_filepath,
-                mode="pair", loss_type="cosine", warmup_filepath=None,
-                epochs=5, warmup_epochs=5, n_trials=50, validate_filepath=None):
+                mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None,
+                epochs=5, n_trials=50, validate_filepath=None):
         """
         Run random search optimization.
         
@@ -27,9 +27,7 @@ class RandomOptimizer(BaseOptimizer):
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
             epochs: Number of training epochs per trial
-            warmup_epochs: Number of warmup epochs
             n_trials: Number of random trials
         """
         print(f"Starting random search optimization for {self.model_type} model")
@@ -51,9 +49,9 @@ class RandomOptimizer(BaseOptimizer):
                 test_filepath=test_filepath,
                 mode=mode,
                 loss_type=loss_type,
-                warmup_filepath=warmup_filepath,
+                medium_filepath=medium_filepath,
                 epochs=epochs,
-                warmup_epochs=warmup_epochs,
+                easy_filepath=easy_filepath,
                 validate_filepath=validate_filepath
             )
             print(f"\nTrial {i+1} completed.")

@@ -27,7 +27,7 @@ class OptunaOptimizer(BaseOptimizer):
         super().__init__(model_type, model_name, device, log_dir)
         
     def objective(self, trial, training_filepath, test_filepath,
-                 mode, loss_type, warmup_filepath=None, epochs=5, warmup_epochs=5, validate_filepath=None):
+                 mode, loss_type, medium_filepath=None, easy_filepath=None, epochs=5, validate_filepath=None):
         """
         Objective function for Optuna optimization.
         
@@ -37,9 +37,7 @@ class OptunaOptimizer(BaseOptimizer):
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
             epochs: Number of training epochs
-            warmup_epochs: Number of warmup epochs
         Returns:
             float: Objective value (accuracy)
         """
@@ -81,9 +79,9 @@ class OptunaOptimizer(BaseOptimizer):
                 test_filepath=test_filepath,
                 mode=mode,
                 loss_type=loss_type,
-                warmup_filepath=warmup_filepath,
+                medium_filepath=medium_filepath,
                 epochs=epochs,
-                warmup_epochs=warmup_epochs,
+                easy_filepath=easy_filepath,
                 validate_filepath=validate_filepath
             )
             
@@ -96,8 +94,8 @@ class OptunaOptimizer(BaseOptimizer):
             return 0.0
     
     def optimize(self, training_filepath, test_filepath,
-                mode="pair", loss_type="cosine", warmup_filepath=None,
-                epochs=5, warmup_epochs=5, n_trials=50, sampler="tpe", 
+                mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None,
+                epochs=5, n_trials=50, sampler="tpe", 
                 pruner="median", study_name=None, validate_filepath=None):
         """
         Run Optuna optimization.
@@ -107,9 +105,7 @@ class OptunaOptimizer(BaseOptimizer):
             test_filepath: Path to test data
             mode: Training mode
             loss_type: Loss function type
-            warmup_filepath: Optional warmup data path
             epochs: Number of training epochs per trial
-            warmup_epochs: Number of warmup epochs
             n_trials: Number of trials
             sampler: Sampler type ("tpe", "random", "cmaes")
             pruner: Pruner type ("median", "hyperband")
@@ -154,7 +150,7 @@ class OptunaOptimizer(BaseOptimizer):
         def objective_wrapper(trial):
             return self.objective(
                 trial, training_filepath, test_filepath,
-                mode, loss_type, warmup_filepath, epochs, warmup_epochs, validate_filepath
+                mode, loss_type, medium_filepath, easy_filepath, epochs, validate_filepath
             )
         
         # Run optimization
