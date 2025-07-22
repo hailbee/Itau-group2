@@ -13,7 +13,7 @@ from model_utils.models.learning.infonce import SiameseModelInfoNCE
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
     parser.add_argument('--mode', type=str, 
-                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline'], 
+                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline', 'evaluate_saved'], 
                       required=True,
                       help='Mode to run: train, grid_search, bayesian, random, optuna, compare, or baseline (supports multiple vision-language models)')
     parser.add_argument('--training_filepath', type=str,
