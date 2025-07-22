@@ -164,8 +164,9 @@ class OptunaOptimizer(BaseOptimizer):
         print("\n" + "="*60)
         print("[DEBUG] FINAL COMPARISON: Evaluating best model on test set after all Optuna trials...")
         print("="*60 + "\n")
-        best_model_path = os.path.join(self.log_dir, 'best_model.pt')
-        best_hparams_path = os.path.join(self.log_dir, 'best_hparams.json')
+        model_id = f"{self.model_type}_{mode}"
+        best_model_path = os.path.join(self.log_dir, f'best_model_{model_id}.pt')
+        best_hparams_path = os.path.join(self.log_dir, f'best_hparams_{model_id}.json')
         
         if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
             with open(best_hparams_path, 'r') as f:
