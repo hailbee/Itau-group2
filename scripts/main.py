@@ -127,7 +127,7 @@ def main():
         model = SiameseModelPairs(embedding_dim=768, projection_dim=512, backbone=backbone_module).to(device)
 
         # Load saved weights
-        state_dict = torch.load(args.log_dir + "/best_model_siglip_triplet.pt", map_location=device)
+        state_dict = torch.load(args.log_dir + "/best_model_siglip_pair.pt", map_location=device)
         model.load_state_dict(state_dict)
         model.eval()
 
