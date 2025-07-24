@@ -311,6 +311,7 @@ def main():
             loss_type=args.loss_type,
             medium_filepath=args.medium_filepath,
             easy_filepath=args.easy_filepath,
+            curriculum=args.curriculum,
             **opt_params,
             validate_filepath=args.validate_filepath
         )
@@ -336,6 +337,7 @@ def main():
             loss_type=args.loss_type,
             medium_filepath=args.medium_filepath,
             easy_filepath=args.easy_filepath,
+            curriculum=args.curriculum,
             **opt_params,
             validate_filepath=args.validate_filepath
         )

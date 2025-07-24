@@ -18,7 +18,7 @@ class RandomOptimizer(BaseOptimizer):
         
     def optimize(self, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None,
-                epochs=5, n_trials=50, validate_filepath=None):
+                epochs=5, n_trials=50, validate_filepath=None, curriculum=None):
         """
         Run random search optimization.
         
@@ -52,7 +52,8 @@ class RandomOptimizer(BaseOptimizer):
                 medium_filepath=medium_filepath,
                 epochs=epochs,
                 easy_filepath=easy_filepath,
-                validate_filepath=validate_filepath
+                validate_filepath=validate_filepath,
+                curriculum=curriculum
             )
             print(f"\nTrial {i+1} completed.")
         

@@ -218,7 +218,7 @@ class BaseOptimizer:
         return self.sample_hyperparameters(mode, n_samples)
     
     def evaluate_trial(self, params, training_filepath, test_filepath, mode, loss_type, medium_filepath=None, easy_filepath=None,
-                      epochs=5, validate_filepath=None, save_best_model=True):
+                      epochs=5, validate_filepath=None, save_best_model=True, curriculum=None):
         """
         Evaluate a single hyperparameter configuration.
         
@@ -300,7 +300,8 @@ class BaseOptimizer:
                 epochs=epochs,
                 medium_loader = medium_loader,
                 easy_loader=easy_loader,
-                validate_filepath=validate_filepath
+                validate_filepath=validate_filepath,
+                curriculum=curriculum
             )
             
             # Log results

@@ -27,7 +27,7 @@ class OptunaOptimizer(BaseOptimizer):
         super().__init__(model_type, model_name, device, log_dir)
         
     def objective(self, trial, training_filepath, test_filepath,
-                 mode, loss_type, medium_filepath=None, easy_filepath=None, epochs=5, validate_filepath=None):
+                 mode, loss_type, medium_filepath=None, easy_filepath=None, epochs=5, validate_filepath=None, curriculum=None):
         """
         Objective function for Optuna optimization.
         
@@ -82,7 +82,8 @@ class OptunaOptimizer(BaseOptimizer):
                 medium_filepath=medium_filepath,
                 epochs=epochs,
                 easy_filepath=easy_filepath,
-                validate_filepath=validate_filepath
+                validate_filepath=validate_filepath,
+                curriculum=curriculum
             )
             
             result["trial_number"] = trial.number + 1
@@ -96,7 +97,7 @@ class OptunaOptimizer(BaseOptimizer):
     def optimize(self, training_filepath, test_filepath,
                 mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None,
                 epochs=5, n_trials=50, sampler="tpe", 
-                pruner="median", study_name=None, validate_filepath=None):
+                pruner="median", study_name=None, validate_filepath=None, curriculum=None):
         """
         Run Optuna optimization.
         
@@ -150,7 +151,7 @@ class OptunaOptimizer(BaseOptimizer):
         def objective_wrapper(trial):
             return self.objective(
                 trial, training_filepath, test_filepath,
-                mode, loss_type, medium_filepath, easy_filepath, epochs, validate_filepath
+                mode, loss_type, medium_filepath, easy_filepath, epochs, validate_filepath, curriculum
             )
         
         # Run optimization
