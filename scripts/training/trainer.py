@@ -146,8 +146,8 @@ class Trainer:
                 print(f"[DEBUG][Self-Paced] Epoch {curriculum_debug_info['epoch']}: easy={curriculum_debug_info['easy_n']} (ratio={ratios['easy']:.3f}), medium={curriculum_debug_info['medium_n']} (ratio={ratios['medium']:.3f}), hard={curriculum_debug_info['hard_n']} (ratio={ratios['hard']:.3f}), total={curriculum_debug_info['total']}")
 
             elif curriculum == "bandit" and medium_loader is not None and easy_loader is not None:
-                epsilon = 0.1
-                reward_window = 3
+                epsilon = 0.2
+                reward_window = 2
 
                 # Bandit curriculum learning
                 # For simplicity, use a local rewards dict
@@ -179,10 +179,13 @@ class Trainer:
                 phase_len = epochs // 3
                 if epoch < phase_len and easy_loader:
                     current_loader = easy_loader
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using EASY dataset (phase 1/{epochs})")
                 elif epoch < 2 * phase_len and medium_loader:
                     current_loader = medium_loader
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using MEDIUM dataset (phase 2/{epochs})")
                 else:
                     current_loader = dataloader
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using HARD dataset (phase 3/{epochs})")
                 curriculum_debug_info = None
 
             avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
