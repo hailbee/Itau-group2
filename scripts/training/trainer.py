@@ -131,9 +131,15 @@ class Trainer:
                 ])
 
                 current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
-
-                # Debugging statement for self-paced curriculum
-                print(f"[DEBUG][Self-Paced] Epoch {epoch+1}: easy={easy_n} (ratio={ratios['easy']:.3f}), medium={medium_n} (ratio={ratios['medium']:.3f}), hard={hard_n} (ratio={ratios['hard']:.3f}), total={easy_n+medium_n+hard_n}")
+                used_curriculum = "self"
+                curriculum_debug_info = {
+                    'epoch': epoch+1,
+                    'easy_n': easy_n,
+                    'medium_n': medium_n,
+                    'hard_n': hard_n,
+                    'ratios': ratios,
+                    'total': easy_n+medium_n+hard_n
+                }
 
             elif curriculum == "bandit" and medium_loader is not None and easy_loader is not None:
                 epsilon = 0.1
@@ -156,9 +162,12 @@ class Trainer:
                     batch_size=dataloader.batch_size,
                     shuffle=True
                 )
-
-                # Debugging statement for bandit curriculum
-                print(f"[DEBUG][Bandit] Epoch {epoch+1}: chosen dataset='{chosen}', avg_rewards=" + ", ".join([f"{k}={avg_rewards[k]:.4f}" for k in avg_rewards]))
+                used_curriculum = "bandit"
+                curriculum_debug_info = {
+                    'epoch': epoch+1,
+                    'chosen': chosen,
+                    'avg_rewards': avg_rewards
+                }
             
             else:
                 phase_len = epochs // 3
@@ -168,9 +177,19 @@ class Trainer:
                     current_loader = medium_loader
                 else:
                     current_loader = dataloader
+                used_curriculum = None
+                curriculum_debug_info = None
 
             avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
             print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
+
+            # Print debugging info after training for the epoch
+            if used_curriculum == "self":
+                ratios = curriculum_debug_info['ratios']
+                print(f"[DEBUG][Self-Paced] Epoch {curriculum_debug_info['epoch']}: easy={curriculum_debug_info['easy_n']} (ratio={ratios['easy']:.3f}), medium={curriculum_debug_info['medium_n']} (ratio={ratios['medium']:.3f}), hard={curriculum_debug_info['hard_n']} (ratio={ratios['hard']:.3f}), total={curriculum_debug_info['total']}")
+            elif used_curriculum == "bandit":
+                avg_rewards = curriculum_debug_info['avg_rewards']
+                print(f"[DEBUG][Bandit] Epoch {curriculum_debug_info['epoch']}: chosen dataset='{curriculum_debug_info['chosen']}', avg_rewards=" + ", ".join([f"{k}={avg_rewards[k]:.4f}" for k in avg_rewards]))
 
             if avg_loss < best_epoch_loss:
                 best_epoch_loss = avg_loss
