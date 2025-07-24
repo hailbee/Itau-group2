@@ -229,6 +229,8 @@ def main():
             medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         
+        print(f"DEBUG Main: {args.curriculum}")
+
         ### here: pass in the model_type
         trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
         trainer.train(
