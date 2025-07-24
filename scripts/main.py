@@ -116,6 +116,7 @@ def main():
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
             print(metrics_to_print)
+    
     elif args.mode == 'evaluate_saved':
         print("Loading saved model for evaluation...")
         # Load backbone
@@ -228,8 +229,6 @@ def main():
             
             medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        
-        print(f"DEBUG Main: {args.curriculum}")
 
         ### here: pass in the model_type
         trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)

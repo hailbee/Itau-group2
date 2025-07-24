@@ -110,7 +110,6 @@ class Trainer:
             rewards = {}
 
         for epoch in range(epochs):
-            print(f"DEBUG: {curriculum}")
 
             if curriculum == "self" and medium_loader is not None and easy_loader is not None:
                 
