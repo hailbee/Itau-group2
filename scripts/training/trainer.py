@@ -132,6 +132,9 @@ class Trainer:
 
                 current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
 
+                # Debugging statement for self-paced curriculum
+                print(f"[DEBUG][Self-Paced] Epoch {epoch+1}: easy={easy_n} (ratio={ratios['easy']:.3f}), medium={medium_n} (ratio={ratios['medium']:.3f}), hard={hard_n} (ratio={ratios['hard']:.3f}), total={easy_n+medium_n+hard_n}")
+
             elif curriculum == "bandit" and medium_loader is not None and easy_loader is not None:
                 epsilon = 0.1
                 reward_window = 3
@@ -153,6 +156,9 @@ class Trainer:
                     batch_size=dataloader.batch_size,
                     shuffle=True
                 )
+
+                # Debugging statement for bandit curriculum
+                print(f"[DEBUG][Bandit] Epoch {epoch+1}: chosen dataset='{chosen}', avg_rewards=" + ", ".join([f"{k}={avg_rewards[k]:.4f}" for k in avg_rewards]))
             
             else:
                 phase_len = epochs // 3
