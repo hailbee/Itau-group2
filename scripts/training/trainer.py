@@ -110,8 +110,11 @@ class Trainer:
             rewards = {}
 
         for epoch in range(epochs):
+            print(f"DEBUG: {curriculum}")
 
             if curriculum == "self" and medium_loader is not None and easy_loader is not None:
+                
+                print(f"[DEBUG][Self-Paced] Epoch {epoch+1}")
                 # new ratios for three dataset
                 ratios = get_curriculum_ratios(epoch, epochs)
 
@@ -164,7 +167,6 @@ class Trainer:
                     batch_size=dataloader.batch_size,
                     shuffle=True
                 )
-                used_curriculum = "bandit"
                 curriculum_debug_info = {
                     'epoch': epoch+1,
                     'chosen': chosen,
@@ -182,7 +184,6 @@ class Trainer:
                     current_loader = medium_loader
                 else:
                     current_loader = dataloader
-                used_curriculum = None
                 curriculum_debug_info = None
 
             avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
