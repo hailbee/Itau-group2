@@ -226,23 +226,28 @@ def main():
                 from utils.data import TextPairDataset
                 medium_dataset = TextPairDataset(medium_dataframe)
                 easy_dataset = TextPairDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "triplet":
                 from utils.data import TripletDataset
                 medium_dataset = TripletDataset(medium_dataframe)
                 easy_dataset = TripletDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "supcon":
                 from utils.data import SupConDataset
                 medium_dataset = SupConDataset(medium_dataframe)
                 easy_dataset = SupConDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
             elif args.model_type == "infonce":
                 from utils.data import InfoNCEDataset
                 medium_dataset = InfoNCEDataset(medium_dataframe)
                 easy_dataset = InfoNCEDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
             else:
                 raise ValueError(f"Unknown model type: {args.model_type}")
-            
-            medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-            easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
 
         ### here: pass in the model_type
         trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
