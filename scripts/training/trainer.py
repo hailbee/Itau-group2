@@ -179,13 +179,13 @@ class Trainer:
                 phase_len = epochs // 3
                 if epoch < phase_len and easy_loader:
                     current_loader = easy_loader
-                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using EASY dataset (phase 1/{epochs})")
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using EASY dataset")
                 elif epoch < 2 * phase_len and medium_loader:
                     current_loader = medium_loader
-                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using MEDIUM dataset (phase 2/{epochs})")
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using MEDIUM dataset")
                 else:
                     current_loader = dataloader
-                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using HARD dataset (phase 3/{epochs})")
+                    print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using HARD dataset")
                 curriculum_debug_info = None
 
             avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
