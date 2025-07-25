@@ -10,6 +10,18 @@ from model_utils.models.learning.siamese import SiameseModelPairs, SiameseModelT
 from model_utils.models.learning.supcon import SiameseModelSupCon
 from model_utils.models.learning.infonce import SiameseModelInfoNCE
 
+def infonce_collate_fn(batch):
+    anchors = [item['anchor'] for item in batch]
+    positives = [item['positive'] for item in batch]
+    negatives = [item['negatives'] for item in batch]
+    return {'anchor': anchors, 'positive': positives, 'negatives': negatives}
+
+def supcon_collate_fn(batch):
+    anchors = [item['anchor'] for item in batch]
+    positives = [item['positives'] for item in batch]
+    negatives = [item['negatives'] for item in batch]
+    return {'anchor': anchors, 'positives': positives, 'negatives': negatives}
+
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
     parser.add_argument('--mode', type=str, 
@@ -187,19 +199,21 @@ def main():
         if args.model_type == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "supcon":
             from utils.data import SupConDataset
             dataset = SupConDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
         elif args.model_type == "infonce":
             from utils.data import InfoNCEDataset
             dataset = InfoNCEDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown model type: {args.model_type}")
-        
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         
         # Create warmup dataloader if warmup filepath is provided
         easy_loader = None

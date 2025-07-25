@@ -144,7 +144,7 @@ class SupConDataset(Dataset):
                 # Pad by repeating the first negative
                 negatives = negatives + [negatives[0]] * (self.n_negatives - len(negatives))
             
-        return anchor, positives, negatives
+        return {'anchor': anchor, 'positives': positives, 'negatives': negatives}
 
 class InfoNCEDataset(Dataset):
     def __init__(self, dataframe, max_negatives=6):
@@ -207,7 +207,7 @@ class InfoNCEDataset(Dataset):
         
         if self.consistent_negatives:
             # Use all negatives as-is
-            return anchor, positive, negatives
+            return {'anchor': anchor, 'positive': positive, 'negatives': negatives}
         else:
             # Pad or truncate to max_negatives
             if len(negatives) >= self.n_negatives:
@@ -216,4 +216,4 @@ class InfoNCEDataset(Dataset):
                 # Pad by repeating the first negative
                 negatives = negatives + [negatives[0]] * (self.n_negatives - len(negatives))
             
-            return anchor, positive, negatives
+            return {'anchor': anchor, 'positive': positive, 'negatives': negatives}
