@@ -233,19 +233,36 @@ class GridSearcher:
         if mode == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 0
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "supcon":
             from utils.data import SupConDataset
             dataset = SupConDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            def supcon_collate_fn(batch):
+                anchors = [item['anchor'] for item in batch]
+                positives = [item['positives'] for item in batch]
+                negatives = [item['negatives'] for item in batch]
+                return {'anchor': anchors, 'positives': positives, 'negatives': negatives}
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=supcon_collate_fn)
         elif mode == "infonce":
             from utils.data import InfoNCEDataset
             dataset = InfoNCEDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            def infonce_collate_fn(batch):
+                anchors = [item['anchor'] for item in batch]
+                positives = [item['positive'] for item in batch]
+                negatives = [item['negatives'] for item in batch]
+                return {'anchor': anchors, 'positive': positives, 'negatives': negatives}
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=infonce_collate_fn)
         else:
-            raise ValueError(f"Unknown mode: {mode}")
-
-        from torch.utils.data import DataLoader
-        # Use num_workers=0 for pair mode to avoid device mismatch issues
-        num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers) 
+            raise ValueError(f"Unknown mode: {mode}") 
