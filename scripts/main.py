@@ -197,9 +197,9 @@ def main():
             dataset = SupConDataset(dataframe)
             dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "infonce":
-            from utils.data import InfoNCEDataset
+            from utils.data import InfoNCEDataset, infonce_collate_fn
             dataset = InfoNCEDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown model type: {args.model_type}")
         
@@ -223,17 +223,17 @@ def main():
                 medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
                 easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "supcon":
-                from utils.data import SupConDataset
+                from utils.data import SupConDataset, supcon_collate_fn
                 medium_dataset = SupConDataset(medium_dataframe)
                 easy_dataset = SupConDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
             elif args.model_type == "infonce":
-                from utils.data import InfoNCEDataset
+                from utils.data import InfoNCEDataset, infonce_collate_fn
                 medium_dataset = InfoNCEDataset(medium_dataframe)
                 easy_dataset = InfoNCEDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
             else:
                 raise ValueError(f"Unknown model type: {args.model_type}")
 

@@ -146,6 +146,14 @@ class SupConDataset(Dataset):
             
         return anchor, positives, negatives
 
+def infonce_collate_fn(batch):
+    anchors, positives, negatives = zip(*batch)
+    return list(anchors), list(positives), list(negatives)
+
+def supcon_collate_fn(batch):
+    anchors, positives, negatives = zip(*batch)
+    return list(anchors), list(positives), list(negatives)
+
 class InfoNCEDataset(Dataset):
     def __init__(self, dataframe, max_negatives=6):
         """
