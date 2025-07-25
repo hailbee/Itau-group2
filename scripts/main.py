@@ -10,18 +10,6 @@ from model_utils.models.learning.siamese import SiameseModelPairs, SiameseModelT
 from model_utils.models.learning.supcon import SiameseModelSupCon
 from model_utils.models.learning.infonce import SiameseModelInfoNCE
 
-def infonce_collate_fn(batch):
-    anchors = [item['anchor'] for item in batch]
-    positives = [item['positive'] for item in batch]
-    negatives = [item['negatives'] for item in batch]
-    return {'anchor': anchors, 'positive': positives, 'negatives': negatives}
-
-def supcon_collate_fn(batch):
-    anchors = [item['anchor'] for item in batch]
-    positives = [item['positives'] for item in batch]
-    negatives = [item['negatives'] for item in batch]
-    return {'anchor': anchors, 'positives': positives, 'negatives': negatives}
-
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
     parser.add_argument('--mode', type=str, 
@@ -207,11 +195,11 @@ def main():
         elif args.model_type == "supcon":
             from utils.data import SupConDataset
             dataset = SupConDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "infonce":
             from utils.data import InfoNCEDataset
             dataset = InfoNCEDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         else:
             raise ValueError(f"Unknown model type: {args.model_type}")
         
@@ -238,14 +226,14 @@ def main():
                 from utils.data import SupConDataset
                 medium_dataset = SupConDataset(medium_dataframe)
                 easy_dataset = SupConDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "infonce":
                 from utils.data import InfoNCEDataset
                 medium_dataset = InfoNCEDataset(medium_dataframe)
                 easy_dataset = InfoNCEDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             else:
                 raise ValueError(f"Unknown model type: {args.model_type}")
 
