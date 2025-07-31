@@ -125,7 +125,7 @@ class BaseOptimizer:
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 8
+            num_workers = 16
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
