@@ -1,3 +1,4 @@
+from ast import Num
 import torch
 import pandas as pd
 import numpy as np
@@ -265,7 +266,7 @@ class BaseOptimizer:
                 easy_dataframe = pd.read_parquet(easy_filepath)
             
             # Create dataloaders
-            dataloader = self.create_dataloader(dataframe, batch_size, mode)
+            dataloader = self.create_dataloader(dataframe, batch_size, mode, num_workers=4)
             medium_loader = None
             easy_loader = None
             if medium_dataframe is not None and easy_dataframe is not None:
