@@ -125,7 +125,7 @@ class BaseOptimizer:
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 8
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
@@ -265,7 +265,7 @@ class BaseOptimizer:
                 easy_dataframe = pd.read_parquet(easy_filepath)
             
             # Create dataloaders
-            dataloader = self.create_dataloader(dataframe, batch_size, mode, num_workers=4)
+            dataloader = self.create_dataloader(dataframe, batch_size, mode)
             medium_loader = None
             easy_loader = None
             if medium_dataframe is not None and easy_dataframe is not None:
