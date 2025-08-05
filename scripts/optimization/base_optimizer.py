@@ -158,28 +158,6 @@ class BaseOptimizer:
         else:  # sgd
             return torch.optim.SGD(model.parameters(), lr=params['lr'], weight_decay=params['weight_decay'])
     
-    def create_scheduler(self, optimizer, params, total_steps):
-        """
-        Create a learning rate scheduler.
-        
-        Args:
-            optimizer: The optimizer to schedule
-            params: Dictionary containing scheduler parameters
-            total_steps: Total number of training steps (for per-batch scheduling)
-            
-        Returns:
-            LR scheduler instance
-        """
-        # Always use cosine scheduler
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, 
-            T_max=total_steps,
-            eta_min=params.get('min_lr', 1e-7)
-        )
-        print(f"[DEBUG] Created CosineAnnealingLR scheduler: T_max={total_steps}, min_lr={params.get('min_lr', 1e-7):.6f}")
-        
-        return scheduler
-    
     def sample_hyperparameters(self, mode, n_samples):
         """
         Sample hyperparameters for optimization.
@@ -212,9 +190,6 @@ class BaseOptimizer:
             # Sample dropout rate (uniform between 0.0 and 0.5)
             dropout_rate = np.random.uniform(0.0, 0.5)
             
-            # Sample min_lr for cosine scheduler
-            min_lr = np.exp(np.random.uniform(np.log(1e-7), np.log(1e-5)))
-            
             if mode in ["supcon", "infonce"]:
                 # Sample temperature (log-uniform)
                 temperature = np.exp(np.random.uniform(np.log(0.01), np.log(1.0)))
@@ -224,7 +199,6 @@ class BaseOptimizer:
                     'temperature': temperature,
                     'internal_layer_size': internal_layer_size,
                     'dropout_rate': dropout_rate,
-                    'min_lr': min_lr,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -237,7 +211,6 @@ class BaseOptimizer:
                     'margin': margin,
                     'internal_layer_size': internal_layer_size,
                     'dropout_rate': dropout_rate,
-                    'min_lr': min_lr,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -283,8 +256,7 @@ class BaseOptimizer:
             
             # Log parameters being tested
             dropout_rate = params.get('dropout_rate', 0.0)
-            min_lr = params.get('min_lr', 1e-7)
-            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}, Dropout: {dropout_rate:.2f}, Min_LR: {min_lr:.6f}"
+            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}, Dropout: {dropout_rate:.2f}"
             if mode in ["supcon", "infonce"]:
                 param_str += f", Temp: {params['temperature']:.4f}"
             else:
@@ -312,15 +284,6 @@ class BaseOptimizer:
             model = self.create_siamese_model(mode, internal_layer_size, dropout_rate).to(self.device)
             optimizer = self.create_optimizer(model, params)
             
-            # Calculate total steps for scheduler
-            total_samples = len(dataframe)
-            steps_per_epoch = total_samples // batch_size
-            total_steps = steps_per_epoch * epochs
-            print(f"[DEBUG] Total training steps: {total_steps} ({steps_per_epoch} steps/epoch × {epochs} epochs)")
-            
-            # Create scheduler
-            scheduler = self.create_scheduler(optimizer, params, total_steps)
-            
             # Get loss class and create criterion
             loss_class = self.get_loss_class(mode, loss_type)
             if mode in ["supcon", "infonce"]:
@@ -340,8 +303,7 @@ class BaseOptimizer:
                 optimizer=optimizer,
                 device=self.device,
                 log_csv_path=f"{self.log_dir}/training_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                model_type=mode,
-                scheduler=scheduler
+                model_type=mode
             )
             evaluator = Evaluator(model, batch_size=batch_size, model_type=mode)
             
@@ -364,8 +326,6 @@ class BaseOptimizer:
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
                 "dropout_rate": dropout_rate,
-                "scheduler": "cosine", # Always cosine scheduler
-                "min_lr": min_lr,
                 "optimizer": params['optimizer'],
                 "weight_decay": params['weight_decay'],
                 "mode": mode,

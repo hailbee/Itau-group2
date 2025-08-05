@@ -13,23 +13,18 @@ class Trainer:
     Handles training, validation, and logging.
     """
 
-    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv", model_type=None, scheduler=None):
+    def __init__(self, model, criterion, optimizer, device, log_csv_path="training_log.csv", model_type=None):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
-        self.scheduler = scheduler
         self.device = device
         self.log_csv_path = log_csv_path
         self.model_type = model_type
         self.model.to(device)
         self.evaluator = Evaluator(model, model_type=model_type)
         
-        # Debug: Print scheduler info
-        if scheduler is not None:
-            print(f"[DEBUG] LR Scheduler initialized: {type(scheduler).__name__}")
-            print(f"[DEBUG] Initial learning rate: {optimizer.param_groups[0]['lr']:.6f}")
-        else:
-            print(f"[DEBUG] No LR scheduler - using fixed learning rate: {optimizer.param_groups[0]['lr']:.6f}")
+        # Debug: Print learning rate info
+        print(f"[DEBUG] Using fixed learning rate: {optimizer.param_groups[0]['lr']:.6f}")
 
 
     def train_epoch(self, dataloader, mode="pair", track_pg = False, epoch_num=None):
@@ -38,18 +33,6 @@ class Trainer:
         epoch_loss = 0.0
         total_pg = 0
         pg_count = 0
-        
-        # Track LR changes for debugging
-        initial_lr = self.optimizer.param_groups[0]['lr']
-        lr_changes = 0
-        
-        # Track dropout status
-        dropout_rate = getattr(self.model, 'dropout_rate', 0.0)
-        if epoch_num == 1:  # Only print once at the start of training
-            if dropout_rate > 0:
-                print(f"[DEBUG] Dropout active during training (rate: {dropout_rate})")
-            else:
-                print(f"[DEBUG] Dropout inactive during training (rate: {dropout_rate})")
 
         for i, batch in enumerate(dataloader):
             if mode == "triplet":
@@ -68,17 +51,6 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            
-            # Step the scheduler after optimizer.step() (PyTorch best practice)
-            if self.scheduler is not None:
-                self.scheduler.step()
-                current_lr = self.optimizer.param_groups[0]['lr']
-                if current_lr != initial_lr:
-                    lr_changes += 1
-                    if lr_changes <= 3:  # Only print first few changes to avoid spam
-                        print(f"[DEBUG] LR changed at batch {i}: {initial_lr:.6f} -> {current_lr:.6f}")
-                    elif lr_changes == 4:
-                        print(f"[DEBUG] ... (more LR changes will occur but not logged to avoid spam)")
 
             if track_pg:
                 with torch.no_grad():
@@ -94,11 +66,6 @@ class Trainer:
                 print(f"Step {i} complete out of {len(dataloader)} | LR: {current_lr:.6f}")
 
         avg_pg = total_pg/pg_count if track_pg and pg_count > 0 else None
-        final_lr = self.optimizer.param_groups[0]['lr']
-        
-        # Debug: Print epoch LR summary
-        if self.scheduler is not None:
-            print(f"[DEBUG] Epoch {epoch_num} LR summary: {initial_lr:.6f} -> {final_lr:.6f} ({lr_changes} changes)")
         
         return epoch_loss / len(dataloader), avg_pg
 
