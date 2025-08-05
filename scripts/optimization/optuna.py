@@ -42,9 +42,9 @@ class OptunaOptimizer(BaseOptimizer):
             float: Objective value (accuracy)
         """
         # Suggest hyperparameters
-        lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
-        internal_layer_size = trial.suggest_categorical("internal_layer_size", [64, 128, 256, 512])
+        lr = trial.suggest_float("lr", 1e-5, 1e-4, log=True)
+        batch_size = trial.suggest_categorical("batch_size", [64])
+        internal_layer_size = trial.suggest_categorical("internal_layer_size", [512, 768, 1024])
         
         params = {}
         
@@ -52,14 +52,14 @@ class OptunaOptimizer(BaseOptimizer):
             temperature = trial.suggest_float("temperature", 0.01, 1.0, log=True)
             params['temperature'] = temperature
         else:
-            margin = trial.suggest_float("margin", 0.2, 1.0)
+            margin = trial.suggest_float("margin", 0.05, 0.7)
             params['margin'] = margin
         
         # Optional: suggest optimizer
         optimizer_name = trial.suggest_categorical("optimizer", ["adam"])
        
         # Optional: suggest weight decay
-        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
         
         # Create parameter dictionary
         params.update({
