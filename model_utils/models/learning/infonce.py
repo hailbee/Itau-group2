@@ -17,7 +17,7 @@ class SiameseModelInfoNCE(BaseSiameseModel):
         Args:
             anchor_text: list of anchor text strings, len=batch_size
             positive_text: list of positive text strings, len=batch_size
-            negative_texts: tuple of lists or list of tuples of negative text strings
+            negative_texts: list of lists of negative text strings, shape [batch_size, n_negatives]
         Returns:
             tuple: (z_anchor, z_positives, z_negatives) embeddings
         """
@@ -26,15 +26,20 @@ class SiameseModelInfoNCE(BaseSiameseModel):
         # Encode positives
         z_positive = self.encode(positive_text)  # [batch_size, emb_dim]
         z_positives = z_positive.unsqueeze(1)  # [batch_size, 1, emb_dim]
-        # negatives: tuple of lists, shape [batch_size, n_negatives] or list of tuples [n_negatives, batch_size]
-        # Transpose if needed
-        if isinstance(negative_texts, tuple) and isinstance(negative_texts[0], list):
-            negative_texts = list(zip(*negative_texts))
+        
+        # Process negatives: negative_texts is a list of lists [batch_size, n_negatives]
         batch_size = len(anchor_text)
-        n_negatives = len(negative_texts)
+        n_negatives = len(negative_texts[0]) if negative_texts else 0
+        
+        # Flatten all negatives for batch encoding
         flat_negatives = []
-        for neg_batch in negative_texts:
-            flat_negatives.extend(neg_batch)
-        z_negatives_flat = self.encode(flat_negatives)
-        z_negatives = z_negatives_flat.view(n_negatives, batch_size, -1).transpose(0, 1)
+        for neg_list in negative_texts:
+            flat_negatives.extend(neg_list)
+        
+        # Encode all negatives at once
+        z_negatives_flat = self.encode(flat_negatives)  # [batch_size * n_negatives, emb_dim]
+        
+        # Reshape to [batch_size, n_negatives, emb_dim]
+        z_negatives = z_negatives_flat.view(batch_size, n_negatives, -1)
+        
         return z_anchor, z_positives, z_negatives

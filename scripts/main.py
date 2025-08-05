@@ -116,6 +116,7 @@ def main():
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
             print(metrics_to_print)
+    
     elif args.mode == 'evaluate_saved':
         print("Loading saved model for evaluation...")
         # Load backbone
@@ -124,10 +125,10 @@ def main():
         backbone_module = tester.model_wrapper  # must have .encode_text
         
         # Load your model with matching dimensions
-        model = SiameseModelPairs(embedding_dim=768, projection_dim=512, backbone=backbone_module).to(device)
+        model = SiameseModelPairs(embedding_dim=768, projection_dim=256, backbone=backbone_module).to(device)
 
         # Load saved weights
-        state_dict = torch.load(args.log_dir + "/best_model.pt", map_location=device)
+        state_dict = torch.load(args.log_dir + "/best_model_siglip_pair.pt", map_location=device)
         model.load_state_dict(state_dict)
         model.eval()
 
@@ -186,19 +187,21 @@ def main():
         if args.model_type == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "supcon":
             from utils.data import SupConDataset
             dataset = SupConDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         elif args.model_type == "infonce":
-            from utils.data import InfoNCEDataset
+            from utils.data import InfoNCEDataset, infonce_collate_fn
             dataset = InfoNCEDataset(dataframe)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown model type: {args.model_type}")
-        
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
         
         # Create warmup dataloader if warmup filepath is provided
         easy_loader = None
@@ -211,24 +214,29 @@ def main():
                 from utils.data import TextPairDataset
                 medium_dataset = TextPairDataset(medium_dataframe)
                 easy_dataset = TextPairDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "triplet":
                 from utils.data import TripletDataset
                 medium_dataset = TripletDataset(medium_dataframe)
                 easy_dataset = TripletDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
             elif args.model_type == "supcon":
-                from utils.data import SupConDataset
+                from utils.data import SupConDataset, supcon_collate_fn
                 medium_dataset = SupConDataset(medium_dataframe)
                 easy_dataset = SupConDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
             elif args.model_type == "infonce":
-                from utils.data import InfoNCEDataset
+                from utils.data import InfoNCEDataset, infonce_collate_fn
                 medium_dataset = InfoNCEDataset(medium_dataframe)
                 easy_dataset = InfoNCEDataset(easy_dataframe)
+                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
+                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
             else:
                 raise ValueError(f"Unknown model type: {args.model_type}")
-            
-            medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-            easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        
+
         ### here: pass in the model_type
         trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
         trainer.train(
@@ -309,6 +317,7 @@ def main():
             loss_type=args.loss_type,
             medium_filepath=args.medium_filepath,
             easy_filepath=args.easy_filepath,
+            curriculum=args.curriculum,
             **opt_params,
             validate_filepath=args.validate_filepath
         )
@@ -334,6 +343,7 @@ def main():
             loss_type=args.loss_type,
             medium_filepath=args.medium_filepath,
             easy_filepath=args.easy_filepath,
+            curriculum=args.curriculum,
             **opt_params,
             validate_filepath=args.validate_filepath
         )

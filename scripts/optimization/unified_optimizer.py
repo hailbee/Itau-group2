@@ -137,7 +137,7 @@ class UnifiedHyperparameterOptimizer:
         return new_params
     
     def optimize(self, method, training_filepath, test_filepath,
-                mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None, validate_filepath=None, **kwargs):
+                mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None, validate_filepath=None, curriculum=None, **kwargs):
         """
         Run hyperparameter optimization using the specified method.
         """
@@ -147,51 +147,51 @@ class UnifiedHyperparameterOptimizer:
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_bayesian_optimization(
                 training_filepath, test_filepath,
-                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, **filtered
+                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **filtered
             )
         elif method == "random":
             allowed = ["n_trials", "epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_random_optimization(
                 training_filepath, test_filepath,
-                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, **filtered
+                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **filtered
             )
         elif method == "optuna":
             allowed = ["n_trials", "sampler", "pruner", "study_name", "epochs"]
             filtered = {k: kwargs[k] for k in allowed if k in kwargs}
             return self._run_optuna_optimization(
                 training_filepath, test_filepath,
-                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, **filtered
+                mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **filtered
             )
         else:
             raise ValueError(f"Unknown optimization method: {method}")
     
     def _run_bayesian_optimization(self, training_filepath, test_filepath,
-                                 mode, loss_type, medium_filepath, easy_filepath, **kwargs):
+                                 mode, loss_type, medium_filepath, easy_filepath, validate_filepath=None, curriculum=None, **kwargs):
         """Run Bayesian optimization."""
         return self.bayesian_optimizer.optimize(
             training_filepath, test_filepath,
-            mode, loss_type, medium_filepath, easy_filepath, **kwargs
+            mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **kwargs
         )
     
     def _run_random_optimization(self, training_filepath, test_filepath,
-                               mode, loss_type, medium_filepath, easy_filepath, **kwargs):
+                               mode, loss_type, medium_filepath, easy_filepath, validate_filepath=None, curriculum=None, **kwargs):
         """Run random search optimization."""
         return self.random_optimizer.optimize(
             training_filepath, test_filepath,
-            mode, loss_type, medium_filepath, easy_filepath, **kwargs
+            mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **kwargs
         )
     
     def _run_optuna_optimization(self, training_filepath, test_filepath,
-                               mode, loss_type, medium_filepath, easy_filepath, **kwargs):
+                               mode, loss_type, medium_filepath, easy_filepath, validate_filepath=None, curriculum=None, **kwargs):
         """Run Optuna optimization."""
         return self.optuna_optimizer.optimize(
             training_filepath, test_filepath,
-            mode, loss_type, medium_filepath, easy_filepath, **kwargs
+            mode, loss_type, medium_filepath, easy_filepath, validate_filepath=validate_filepath, curriculum=curriculum, **kwargs
         )
     
     def compare_methods(self, training_filepath, test_filepath,
-                       mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None, **kwargs):
+                       mode="pair", loss_type="cosine", medium_filepath=None, easy_filepath=None, curriculum=None, **kwargs):
         """
         Compare different optimization methods on the same problem.
         """
@@ -215,7 +215,7 @@ class UnifiedHyperparameterOptimizer:
                 filtered = {k: kwargs[k] for k in allowed if k in kwargs}
                 method_results = self.optimize(
                     method, training_filepath, test_filepath,
-                    mode, loss_type, medium_filepath, easy_filepath, **filtered
+                    mode, loss_type, medium_filepath, easy_filepath, curriculum=curriculum, **filtered
                 )
                 results[method] = method_results
                 if method_results:

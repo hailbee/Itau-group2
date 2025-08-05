@@ -124,22 +124,29 @@ class BaseOptimizer:
         if mode == "pair":
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 16
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "supcon":
-            from utils.data import SupConDataset
+            from utils.data import SupConDataset, supcon_collate_fn
             dataset = SupConDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=supcon_collate_fn)
         elif mode == "infonce":
-            from utils.data import InfoNCEDataset
+            from utils.data import InfoNCEDataset, infonce_collate_fn
             dataset = InfoNCEDataset(dataframe)
+            from torch.utils.data import DataLoader
+            num_workers = 4
+            return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown mode: {mode}")
-
-        from torch.utils.data import DataLoader
-        # Use num_workers=0 for pair mode to avoid device mismatch issues
-        num_workers = 0 if mode == "pair" else 4
-        return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     def create_optimizer(self, model, params):
         """Create optimizer based on parameters"""
@@ -218,7 +225,7 @@ class BaseOptimizer:
         return self.sample_hyperparameters(mode, n_samples)
     
     def evaluate_trial(self, params, training_filepath, test_filepath, mode, loss_type, medium_filepath=None, easy_filepath=None,
-                      epochs=5, validate_filepath=None, save_best_model=True):
+                      epochs=5, validate_filepath=None, save_best_model=True, curriculum=None):
         """
         Evaluate a single hyperparameter configuration.
         
@@ -300,7 +307,8 @@ class BaseOptimizer:
                 epochs=epochs,
                 medium_loader = medium_loader,
                 easy_loader=easy_loader,
-                validate_filepath=validate_filepath
+                validate_filepath=validate_filepath,
+                curriculum=curriculum
             )
             
             # Log results
@@ -332,8 +340,9 @@ class BaseOptimizer:
             if save_best_model and best_metrics.get('roc_auc', 0) > getattr(self, 'best_auc', 0):
                 self.best_auc = best_metrics['roc_auc']
                 self.best_accuracy = best_metrics['accuracy']
-                torch.save(model.state_dict(), os.path.join(self.log_dir, 'best_model.pt'))
-                with open(os.path.join(self.log_dir, 'best_hparams.json'), 'w') as f:
+                model_id = f"{self.model_type}_{mode}"
+                torch.save(model.state_dict(), os.path.join(self.log_dir, f'best_model_{model_id}.pt'))
+                with open(os.path.join(self.log_dir, f'best_hparams_{model_id}.json'), 'w') as f:
                     json.dump(convert_np(params), f)
             
             return result
