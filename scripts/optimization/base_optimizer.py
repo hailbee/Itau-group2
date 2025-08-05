@@ -59,13 +59,14 @@ class BaseOptimizer:
         backbone = ModelFactory.create_model(self.model_type, self.model_name, self.device)
         return backbone
     
-    def create_siamese_model(self, mode, projection_dim=128):
+    def create_siamese_model(self, mode, projection_dim=128, dropout_rate=0.0):
         """
         Create a siamese model for the specified mode.
         
         Args:
             mode: Training mode ("pair", "triplet", "supcon", "infonce")
             projection_dim: Dimension of the projection layer
+            dropout_rate: Dropout rate for regularization (0.0 to 1.0)
             
         Returns:
             Siamese model instance
@@ -74,13 +75,13 @@ class BaseOptimizer:
             backbone = self.create_model(projection_dim)
             
             if mode == "pair":
-                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone, dropout_rate)
             elif mode == "triplet":
-                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone, dropout_rate)
             elif mode == "supcon":
-                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone, dropout_rate)
             elif mode == "infonce":
-                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone, dropout_rate)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
                 
@@ -125,25 +126,25 @@ class BaseOptimizer:
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 16
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "supcon":
             from utils.data import SupConDataset, supcon_collate_fn
             dataset = SupConDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=supcon_collate_fn)
         elif mode == "infonce":
             from utils.data import InfoNCEDataset, infonce_collate_fn
             dataset = InfoNCEDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -186,6 +187,9 @@ class BaseOptimizer:
             # Sample weight decay
             weight_decay = np.exp(np.random.uniform(np.log(1e-6), np.log(1e-3)))
             
+            # Sample dropout rate (uniform between 0.0 and 0.5)
+            dropout_rate = np.random.uniform(0.0, 0.5)
+            
             if mode in ["supcon", "infonce"]:
                 # Sample temperature (log-uniform)
                 temperature = np.exp(np.random.uniform(np.log(0.01), np.log(1.0)))
@@ -194,6 +198,7 @@ class BaseOptimizer:
                     'batch_size': batch_size,
                     'temperature': temperature,
                     'internal_layer_size': internal_layer_size,
+                    'dropout_rate': dropout_rate,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -205,6 +210,7 @@ class BaseOptimizer:
                     'batch_size': batch_size,
                     'margin': margin,
                     'internal_layer_size': internal_layer_size,
+                    'dropout_rate': dropout_rate,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -249,7 +255,8 @@ class BaseOptimizer:
             lr = float(params['lr'])
             
             # Log parameters being tested
-            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}"
+            dropout_rate = params.get('dropout_rate', 0.0)
+            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}, Dropout: {dropout_rate:.2f}"
             if mode in ["supcon", "infonce"]:
                 param_str += f", Temp: {params['temperature']:.4f}"
             else:
@@ -273,7 +280,8 @@ class BaseOptimizer:
                 easy_loader = self.create_dataloader(easy_dataframe, batch_size, mode)
             
             # Create model and optimizer
-            model = self.create_siamese_model(mode, internal_layer_size).to(self.device)
+            dropout_rate = params.get('dropout_rate', 0.0)
+            model = self.create_siamese_model(mode, internal_layer_size, dropout_rate).to(self.device)
             optimizer = self.create_optimizer(model, params)
             
             # Get loss class and create criterion
@@ -317,6 +325,7 @@ class BaseOptimizer:
                 "lr": lr,
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
+                "dropout_rate": dropout_rate,
                 "optimizer": params['optimizer'],
                 "weight_decay": params['weight_decay'],
                 "mode": mode,

@@ -46,6 +46,9 @@ class OptunaOptimizer(BaseOptimizer):
         batch_size = trial.suggest_categorical("batch_size", [64])
         internal_layer_size = trial.suggest_categorical("internal_layer_size", [512, 768, 1024])
         
+        # Suggest dropout rate
+        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.3, step=0.1)
+        
         params = {}
         
         if mode in ["supcon", "infonce"]:
@@ -66,6 +69,7 @@ class OptunaOptimizer(BaseOptimizer):
             'lr': lr,
             'batch_size': batch_size,
             'internal_layer_size': internal_layer_size,
+            'dropout_rate': dropout_rate,
             'optimizer': optimizer_name,
             'weight_decay': weight_decay
         })
@@ -178,7 +182,8 @@ class OptunaOptimizer(BaseOptimizer):
                 for k, v in best_params.items()
             }
             print(f"[DEBUG] Initial hyperparameters of best model: {rounded_best_params}")
-            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
+            dropout_rate = best_params.get('dropout_rate', 0.0)
+            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128)), dropout_rate).to(self.device)
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()

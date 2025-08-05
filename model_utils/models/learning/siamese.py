@@ -4,8 +4,8 @@ class SiameseModelPairs(BaseSiameseModel):
     """
     Siamese network for pair-wise learning using any vision-language model as backbone.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
-        super().__init__(embedding_dim, projection_dim, backbone)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None, dropout_rate=0.0):
+        super().__init__(embedding_dim, projection_dim, backbone, dropout_rate)
     
     def forward(self, text1, text2, label=None):
         z1 = self.encode(text1)
@@ -19,8 +19,8 @@ class SiameseModelTriplet(BaseSiameseModel):
     """
     Siamese network for triplet learning using any vision-language model as backbone.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
-        super().__init__(embedding_dim, projection_dim, backbone)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None, dropout_rate=0.0):
+        super().__init__(embedding_dim, projection_dim, backbone, dropout_rate)
     
     def forward(self, anchor_texts, positive_texts=None, negative_texts=None):
         z_anchor = self.encode(anchor_texts)
