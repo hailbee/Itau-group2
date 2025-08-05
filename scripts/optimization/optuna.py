@@ -49,6 +49,9 @@ class OptunaOptimizer(BaseOptimizer):
         # Suggest dropout rate
         dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.3, step=0.1)
         
+        # Always use cosine scheduler with min_lr
+        min_lr = trial.suggest_float("min_lr", 1e-7, 1e-5, log=True)
+        
         params = {}
         
         if mode in ["supcon", "infonce"]:
@@ -70,6 +73,7 @@ class OptunaOptimizer(BaseOptimizer):
             'batch_size': batch_size,
             'internal_layer_size': internal_layer_size,
             'dropout_rate': dropout_rate,
+            'min_lr': min_lr,
             'optimizer': optimizer_name,
             'weight_decay': weight_decay
         })
