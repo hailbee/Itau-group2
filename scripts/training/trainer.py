@@ -42,6 +42,14 @@ class Trainer:
         # Track LR changes for debugging
         initial_lr = self.optimizer.param_groups[0]['lr']
         lr_changes = 0
+        
+        # Track dropout status
+        dropout_rate = getattr(self.model, 'dropout_rate', 0.0)
+        if epoch_num == 1:  # Only print once at the start of training
+            if dropout_rate > 0:
+                print(f"[DEBUG] Dropout active during training (rate: {dropout_rate})")
+            else:
+                print(f"[DEBUG] Dropout inactive during training (rate: {dropout_rate})")
 
         for i, batch in enumerate(dataloader):
             if mode == "triplet":

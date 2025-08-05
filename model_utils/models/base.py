@@ -20,11 +20,23 @@ class BaseSiameseModel(nn.Module):
             nn.Dropout(dropout_rate) if dropout_rate > 0 else nn.Identity()
         )
         
-        # Debug: Print dropout configuration
+        # Debug: Print dropout configuration once during model creation
         if dropout_rate > 0:
             print(f"[DEBUG] Dropout enabled with rate: {dropout_rate}")
+            # Verify dropout layers are present
+            dropout_layers = [layer for layer in self.projector if isinstance(layer, nn.Dropout)]
+            print(f"[DEBUG] Found {len(dropout_layers)} dropout layers in projector")
         else:
             print(f"[DEBUG] Dropout disabled (rate: {dropout_rate})")
+
+    def get_dropout_info(self):
+        """Get information about dropout configuration."""
+        dropout_layers = [layer for layer in self.projector if isinstance(layer, nn.Dropout)]
+        return {
+            'dropout_rate': self.dropout_rate,
+            'num_dropout_layers': len(dropout_layers),
+            'dropout_layers': dropout_layers
+        }
 
     def encode(self, texts):
         """
@@ -39,14 +51,8 @@ class BaseSiameseModel(nn.Module):
         features = self.backbone.encode_text(texts)
         z = self.projector(features)
         
-        # Debug: Print dropout status during training
-        if self.training and self.dropout_rate > 0:
-            print(f"[DEBUG] Dropout active during encoding (rate: {self.dropout_rate})")
-        elif self.training and self.dropout_rate == 0:
-            print(f"[DEBUG] Dropout inactive during training (rate: {self.dropout_rate})")
-        elif not self.training and self.dropout_rate > 0:
-            print(f"[DEBUG] Model in eval mode - dropout disabled (rate: {self.dropout_rate})")
-        
+        # Debug: Print dropout status only once per epoch (not every batch)
+        # We'll track this in the trainer instead to avoid spam
         return F.normalize(z, dim=1)
     
     def to(self, device):
