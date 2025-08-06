@@ -27,7 +27,9 @@ class BaseOptimizer:
         self.best_auc = 0.0
         self.best_accuracy = 0.0
         
-        # Create log directory if it doesn't exist
+        # Create log directory if it doesn't exist - use local path if log_dir contains /content
+        if "/content" in self.log_dir:
+            self.log_dir = "optimization_results"
         os.makedirs(self.log_dir, exist_ok=True)
         
         # Create a sample model to get embedding dimension
@@ -73,18 +75,14 @@ class BaseOptimizer:
         try:
             backbone = self.create_model(projection_dim)
             
-            # Ensure we use the correct embedding dimension from the backbone
-            actual_embedding_dim = backbone.embedding_dim
-            print(f"[DEBUG] Creating model with embedding_dim={actual_embedding_dim}, projection_dim={projection_dim}")
-            
             if mode == "pair":
-                return SiameseModelPairs(actual_embedding_dim, projection_dim, backbone)
+                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
             elif mode == "triplet":
-                return SiameseModelTriplet(actual_embedding_dim, projection_dim, backbone)
+                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
             elif mode == "supcon":
-                return SiameseModelSupCon(actual_embedding_dim, projection_dim, backbone)
+                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
             elif mode == "infonce":
-                return SiameseModelInfoNCE(actual_embedding_dim, projection_dim, backbone)
+                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
                 
