@@ -137,7 +137,9 @@ class Trainer:
                     Subset(dataloader.dataset, hard_idx)
                 ])
 
-                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                # Preserve the collate_fn from the original dataloader
+                collate_fn = getattr(dataloader, 'collate_fn', None)
+                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True, collate_fn=collate_fn)
                 curriculum_debug_info = {
                     'epoch': epoch+1,
                     'easy_n': easy_n,
@@ -166,10 +168,13 @@ class Trainer:
                 else:
                    chosen = max(avg_rewards, key=avg_rewards.get)
 
+                # Preserve the collate_fn from the original dataloader
+                collate_fn = getattr(dataloader, 'collate_fn', None)
                 current_loader = DataLoader(
                     datasets[chosen],
                     batch_size=dataloader.batch_size,
-                    shuffle=True
+                    shuffle=True,
+                    collate_fn=collate_fn
                 )
                 curriculum_debug_info = {
                     'epoch': epoch+1,
