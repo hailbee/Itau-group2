@@ -345,6 +345,9 @@ class BaseOptimizer:
                 self.best_auc = best_metrics['roc_auc']
                 self.best_accuracy = best_metrics['accuracy']
                 model_id = f"{self.model_type}_{mode}"
+                # Include curriculum in filename if specified
+                if curriculum:
+                    model_id += f"_{curriculum}"
                 torch.save(model.state_dict(), os.path.join(self.log_dir, f'best_model_{model_id}.pt'))
                 with open(os.path.join(self.log_dir, f'best_hparams_{model_id}.json'), 'w') as f:
                     json.dump(convert_np(params), f)

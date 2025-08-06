@@ -169,6 +169,9 @@ class OptunaOptimizer(BaseOptimizer):
         print("[DEBUG] FINAL COMPARISON: Evaluating best model on test set after all Optuna trials...")
         print("="*60 + "\n")
         model_id = f"{self.model_type}_{mode}"
+        # Include curriculum in filename if specified
+        if curriculum:
+            model_id += f"_{curriculum}"
         best_model_path = os.path.join(self.log_dir, f'best_model_{model_id}.pt')
         best_hparams_path = os.path.join(self.log_dir, f'best_hparams_{model_id}.json')
         
