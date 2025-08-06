@@ -8,8 +8,8 @@ class SiameseModelInfoNCE(BaseSiameseModel):
     Siamese network for InfoNCE learning using any vision-language model as backbone.
     Handles one positive and multiple negative examples per anchor.
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None, dropout_rate=0.0):
-        super().__init__(embedding_dim, projection_dim, backbone, dropout_rate)
+    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
+        super().__init__(embedding_dim, projection_dim, backbone)
     
     def forward(self, anchor_text, positive_text, negative_texts):
         """
