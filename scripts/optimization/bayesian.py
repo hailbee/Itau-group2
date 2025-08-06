@@ -95,8 +95,7 @@ class BayesianOptimizer(BaseOptimizer):
         if os.path.exists(best_model_path) and os.path.exists(best_hparams_path):
             with open(best_hparams_path, 'r') as f:
                 best_params = json.load(f)
-            dropout_rate = best_params.get('dropout_rate', 0.0)
-            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128)), dropout_rate).to(self.device)
+            model = self.create_siamese_model(mode, int(best_params.get('internal_layer_size', 128))).to(self.device)
             model.load_state_dict(torch.load(best_model_path, map_location=self.device))
             evaluator = Evaluator(model, batch_size=int(best_params.get('batch_size', 32)), model_type=mode)
             model.eval()

@@ -59,14 +59,13 @@ class BaseOptimizer:
         backbone = ModelFactory.create_model(self.model_type, self.model_name, self.device)
         return backbone
     
-    def create_siamese_model(self, mode, projection_dim=128, dropout_rate=0.0):
+    def create_siamese_model(self, mode, projection_dim=128):
         """
         Create a siamese model for the specified mode.
         
         Args:
             mode: Training mode ("pair", "triplet", "supcon", "infonce")
             projection_dim: Dimension of the projection layer
-            dropout_rate: Dropout rate for regularization (0.0 to 1.0)
             
         Returns:
             Siamese model instance
@@ -75,13 +74,13 @@ class BaseOptimizer:
             backbone = self.create_model(projection_dim)
             
             if mode == "pair":
-                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone, dropout_rate)
+                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
             elif mode == "triplet":
-                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone, dropout_rate)
+                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
             elif mode == "supcon":
-                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone, dropout_rate)
+                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
             elif mode == "infonce":
-                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone, dropout_rate)
+                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
                 
@@ -187,8 +186,7 @@ class BaseOptimizer:
             # Sample weight decay
             weight_decay = np.exp(np.random.uniform(np.log(1e-6), np.log(1e-3)))
             
-            # Sample dropout rate (uniform between 0.0 and 0.5)
-            dropout_rate = np.random.uniform(0.0, 0.5)
+
             
             if mode in ["supcon", "infonce"]:
                 # Sample temperature (log-uniform)
@@ -198,7 +196,6 @@ class BaseOptimizer:
                     'batch_size': batch_size,
                     'temperature': temperature,
                     'internal_layer_size': internal_layer_size,
-                    'dropout_rate': dropout_rate,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -210,7 +207,6 @@ class BaseOptimizer:
                     'batch_size': batch_size,
                     'margin': margin,
                     'internal_layer_size': internal_layer_size,
-                    'dropout_rate': dropout_rate,
                     'optimizer': optimizer_name,
                     'weight_decay': weight_decay
                 })
@@ -255,8 +251,7 @@ class BaseOptimizer:
             lr = float(params['lr'])
             
             # Log parameters being tested
-            dropout_rate = params.get('dropout_rate', 0.0)
-            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}, Dropout: {dropout_rate:.2f}"
+            param_str = f"LR: {lr:.6f}, Batch: {batch_size}, Layer: {internal_layer_size}, Opt: {params['optimizer']}, WD: {params['weight_decay']:.6f}"
             if mode in ["supcon", "infonce"]:
                 param_str += f", Temp: {params['temperature']:.4f}"
             else:
@@ -280,8 +275,7 @@ class BaseOptimizer:
                 easy_loader = self.create_dataloader(easy_dataframe, batch_size, mode)
             
             # Create model and optimizer
-            dropout_rate = params.get('dropout_rate', 0.0)
-            model = self.create_siamese_model(mode, internal_layer_size, dropout_rate).to(self.device)
+            model = self.create_siamese_model(mode, internal_layer_size).to(self.device)
             optimizer = self.create_optimizer(model, params)
             
             # Get loss class and create criterion
@@ -325,7 +319,6 @@ class BaseOptimizer:
                 "lr": lr,
                 "batch_size": batch_size,
                 "internal_layer_size": internal_layer_size,
-                "dropout_rate": dropout_rate,
                 "optimizer": params['optimizer'],
                 "weight_decay": params['weight_decay'],
                 "mode": mode,
