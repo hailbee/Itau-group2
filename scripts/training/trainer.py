@@ -140,6 +140,17 @@ class Trainer:
                 # Preserve the collate_fn from the original dataloader
                 collate_fn = getattr(dataloader, 'collate_fn', None)
                 current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True, collate_fn=collate_fn)
+                
+                # Debug: Check the first batch to see if data format is correct
+                if self.model_type == "infonce":
+                    try:
+                        first_batch = next(iter(current_loader))
+                        print(f"[DEBUG] First batch types: {type(first_batch[0])}, {type(first_batch[1])}, {type(first_batch[2])}")
+                        print(f"[DEBUG] First batch lengths: {len(first_batch[0])}, {len(first_batch[1])}, {len(first_batch[2])}")
+                        if len(first_batch[2]) > 0:
+                            print(f"[DEBUG] First negative list length: {len(first_batch[2][0])}")
+                    except Exception as e:
+                        print(f"[DEBUG] Error checking first batch: {e}")
                 curriculum_debug_info = {
                     'epoch': epoch+1,
                     'easy_n': easy_n,
