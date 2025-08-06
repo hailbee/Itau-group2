@@ -73,14 +73,18 @@ class BaseOptimizer:
         try:
             backbone = self.create_model(projection_dim)
             
+            # Ensure we use the correct embedding dimension from the backbone
+            actual_embedding_dim = backbone.embedding_dim
+            print(f"[DEBUG] Creating model with embedding_dim={actual_embedding_dim}, projection_dim={projection_dim}")
+            
             if mode == "pair":
-                return SiameseModelPairs(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelPairs(actual_embedding_dim, projection_dim, backbone)
             elif mode == "triplet":
-                return SiameseModelTriplet(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelTriplet(actual_embedding_dim, projection_dim, backbone)
             elif mode == "supcon":
-                return SiameseModelSupCon(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelSupCon(actual_embedding_dim, projection_dim, backbone)
             elif mode == "infonce":
-                return SiameseModelInfoNCE(self.embedding_dim, projection_dim, backbone)
+                return SiameseModelInfoNCE(actual_embedding_dim, projection_dim, backbone)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
                 
