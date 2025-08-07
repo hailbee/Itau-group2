@@ -125,7 +125,7 @@ def main():
         backbone_module = tester.model_wrapper  # must have .encode_text
         
         # Load your model with matching dimensions
-        model = SiameseModelPairs(embedding_dim=768, projection_dim=256, backbone=backbone_module).to(device)
+        model = SiameseModelPairs(embedding_dim=768, projection_dim=768, backbone=backbone_module).to(device)
 
         # Load saved weights
         state_dict = torch.load(args.log_dir + "/best_model_siglip_pair.pt", map_location=device)
