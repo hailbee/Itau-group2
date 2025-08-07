@@ -24,7 +24,7 @@ def main():
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
                       help='Loss function type')
-    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'all'], default='clip',
+    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'siglip', 'openclip', 'all'], default='clip',
                       help='Baseline model to test (for baseline mode)')
     parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip'], default='clip',
                       help='Vision-language backbone to use (clip, siglip, flava, etc.)')
