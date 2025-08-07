@@ -140,6 +140,45 @@ def main():
         for k, v in metrics.items():
             if k != 'roc_curve':
                 print(f"{k}: {v}")
+        
+        # Save results_df to computer
+        import pandas as pd
+        from datetime import datetime
+        import os
+        
+        # Create output directory if it doesn't exist
+        output_dir = "evaluation_results"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"evaluation_results_{timestamp}.csv"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Save results_df to CSV
+        results_df.to_csv(filepath, index=False)
+        print(f"\nResults saved to: {filepath}")
+        
+        # Also save metrics to a separate file
+        metrics_filename = f"evaluation_metrics_{timestamp}.json"
+        metrics_filepath = os.path.join(output_dir, metrics_filename)
+        
+        import json
+        # Convert numpy types to Python types for JSON serialization
+        def convert_np(obj):
+            if isinstance(obj, dict):
+                return {k: convert_np(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_np(v) for v in obj]
+            elif hasattr(obj, 'item') and callable(obj.item):
+                return obj.item()
+            else:
+                return obj
+        
+        metrics_serializable = convert_np(metrics)
+        with open(metrics_filepath, 'w') as f:
+            json.dump(metrics_serializable, f, indent=2)
+        print(f"Metrics saved to: {metrics_filepath}")
 
     elif args.mode == 'train':
         # Single training run
