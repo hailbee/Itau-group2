@@ -112,7 +112,7 @@ def main():
         else:
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_filepath, plot=args.plot)
+            results_df, metrics = tester.test(args.test_filepath)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
             print(metrics_to_print)
