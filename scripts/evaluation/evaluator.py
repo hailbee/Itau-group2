@@ -35,20 +35,17 @@ class Evaluator:
         """
         y_true = results_df['label']
         y_scores = results_df['max_similarity']
-        
-        # Compute ROC curve ONCE and reuse
-        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-        roc_auc = auc(fpr, tpr)
-        print(f"ROC AUC: {roc_auc:.4f}")
-        
-        # Find thresholds using the already computed ROC curve
+        if plot:
+            roc_auc, fpr, tpr, thresholds = plot_roc_curve(results_df)
+        else:
+            fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+            roc_auc = auc(fpr, tpr)
+
+        # Use the ROC curve thresholds for both calculations to avoid redundant computation
         youden_thresh = find_best_threshold_youden(fpr, tpr, thresholds)
         best_acc, best_acc_threshold = find_best_threshold_accuracy(y_true, y_scores, thresholds)
         
-        # Compute predictions
         y_pred = (y_scores > youden_thresh).astype(int)
-        
-        # Build metrics dict
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),
             'precision': precision_score(y_true, y_pred, zero_division=0),
@@ -59,14 +56,10 @@ class Evaluator:
             'best_accuracy': best_acc,
             'best_accuracy_threshold': best_acc_threshold
         }
-        
-        # Plot if requested (using already computed values)
         if plot:
-            plot_roc_curve(results_df)  # This will recompute ROC for plotting, but that's OK for visualization
             plot_confusion_matrix(y_true, y_scores, youden_thresh)
             print(f"Best Accuracy: {best_acc:.4f} at Threshold: {best_acc_threshold:.3f}")
             plot_confusion_matrix(y_true, y_scores, best_acc_threshold)
-        
         return metrics
 
     def evaluate(self, test_filepath, plot=False):
