@@ -15,10 +15,11 @@ import numpy as np
 import json
 import os
 from datetime import datetime
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 import pickle
+from tqdm import tqdm
 
 # Import fuzzy string matching libraries
 from fuzzywuzzy import fuzz
@@ -114,6 +115,67 @@ class EnsemblePipeline:
         
         return results_df
     
+    def apply_model_to_training_data_with_progress(self, training_filepath, desc="Processing"):
+        """
+        Step 1: Apply the pre-trained model to training data with progress bar.
+        
+        Args:
+            training_filepath: Path to training data
+            desc: Description for progress bar
+            
+        Returns:
+            DataFrame with model predictions and features
+        """
+        print(f"Applying pre-trained model to {desc.lower()}...")
+        
+        # Create evaluator
+        evaluator = Evaluator(self.model, batch_size=self.batch_size, model_type='pair')
+        
+        # Load data first to get total count
+        if training_filepath.endswith('.csv'):
+            df = pd.read_csv(training_filepath)
+        else:
+            df = pd.read_parquet(training_filepath)
+        
+        fraud_names = df['fraudulent_name'].astype(str).tolist()
+        real_names = df['real_name'].astype(str).tolist()
+        labels = df['label'].astype(float).tolist()
+        
+        # Process embeddings with progress bar
+        fraud_embs = []
+        real_embs = []
+        
+        # Process in batches with progress bar
+        for i in tqdm(range(0, len(fraud_names), self.batch_size), desc=f"{desc} embeddings"):
+            batch_fraud = fraud_names[i:i+self.batch_size]
+            batch_real = real_names[i:i+self.batch_size]
+            
+            # Get embeddings for this batch
+            batch_fraud_embs = evaluator.extractor.encode(batch_fraud)
+            batch_real_embs = evaluator.extractor.encode(batch_real)
+            
+            fraud_embs.append(batch_fraud_embs.cpu())
+            real_embs.append(batch_real_embs.cpu())
+        
+        # Concatenate all embeddings
+        fraud_embs = torch.cat(fraud_embs, dim=0)
+        real_embs = torch.cat(real_embs, dim=0)
+        
+        # Calculate similarities
+        similarities = torch.cosine_similarity(fraud_embs, real_embs, dim=1).detach().cpu().numpy()
+        
+        # Create results DataFrame
+        results_df = pd.DataFrame({
+            'fraudulent_name': fraud_names,
+            'real_name': real_names,
+            'label': labels,
+            'max_similarity': similarities
+        })
+        
+        print(f"Applied model to {len(results_df)} {desc.lower()} samples")
+        
+        return results_df
+    
     def add_traditional_features(self, results_df):
         """
         Step 2: Add fuzzy string matching features to results_df.
@@ -126,33 +188,41 @@ class EnsemblePipeline:
         """
         print("Adding fuzzy string matching features...")
         
-        # Add Levenshtein distance
-        results_df['lev_dist'] = results_df.apply(
-            lambda row: self.compute_levenshtein_distance(
+        # Add Levenshtein distance with progress bar
+        print("Computing Levenshtein distances...")
+        lev_distances = []
+        for _, row in tqdm(results_df.iterrows(), total=len(results_df), desc="Levenshtein distances"):
+            lev_distances.append(self.compute_levenshtein_distance(
                 str(row['fraudulent_name']), str(row['real_name'])
-            ), axis=1
-        )
+            ))
+        results_df['lev_dist'] = lev_distances
         
-        # Add token set ratio
-        results_df['token_set_ratio'] = results_df.apply(
-            lambda row: self.compute_token_set_ratio(
+        # Add token set ratio with progress bar
+        print("Computing token set ratios...")
+        token_set_ratios = []
+        for _, row in tqdm(results_df.iterrows(), total=len(results_df), desc="Token set ratios"):
+            token_set_ratios.append(self.compute_token_set_ratio(
                 str(row['fraudulent_name']), str(row['real_name'])
-            ), axis=1
-        )
+            ))
+        results_df['token_set_ratio'] = token_set_ratios
         
-        # Add partial ratio
-        results_df['partial_ratio'] = results_df.apply(
-            lambda row: self.compute_partial_ratio(
+        # Add partial ratio with progress bar
+        print("Computing partial ratios...")
+        partial_ratios = []
+        for _, row in tqdm(results_df.iterrows(), total=len(results_df), desc="Partial ratios"):
+            partial_ratios.append(self.compute_partial_ratio(
                 str(row['fraudulent_name']), str(row['real_name'])
-            ), axis=1
-        )
+            ))
+        results_df['partial_ratio'] = partial_ratios
         
-        # Add token sort ratio
-        results_df['token_sort_ratio'] = results_df.apply(
-            lambda row: self.compute_token_sort_ratio(
+        # Add token sort ratio with progress bar
+        print("Computing token sort ratios...")
+        token_sort_ratios = []
+        for _, row in tqdm(results_df.iterrows(), total=len(results_df), desc="Token sort ratios"):
+            token_sort_ratios.append(self.compute_token_sort_ratio(
                 str(row['fraudulent_name']), str(row['real_name'])
-            ), axis=1
-        )
+            ))
+        results_df['token_sort_ratio'] = token_sort_ratios
         
         print(f"Added features for {len(results_df)} samples")
         print(f"Levenshtein distance range: [{results_df['lev_dist'].min()}, {results_df['lev_dist'].max()}]")
@@ -175,7 +245,7 @@ class EnsemblePipeline:
         Returns:
             Trained ensemble model and test results
         """
-        print("Training ensemble model with separate test data...")
+        print("Training Gradient Boosting ensemble model with separate test data...")
         
         # Prepare training features
         feature_columns = ['max_similarity', 'token_set_ratio', 'lev_dist']
@@ -188,12 +258,12 @@ class EnsemblePipeline:
         
         print(f"Training on {len(X_train)} samples, testing on {len(X_test)} samples")
         
-        # Train Random Forest
-        self.ensemble_model = RandomForestClassifier(
+        # Train Gradient Boosting Classifier
+        self.ensemble_model = GradientBoostingClassifier(
             n_estimators=100,
-            max_depth=10,
-            random_state=42,
-            n_jobs=-1
+            max_depth=6,
+            learning_rate=0.1,
+            random_state=42
         )
         
         self.ensemble_model.fit(X_train, y_train)
@@ -206,7 +276,7 @@ class EnsemblePipeline:
         test_accuracy = accuracy_score(y_test, y_pred)
         test_auc = roc_auc_score(y_test, y_proba)
         
-        print(f"Ensemble model performance:")
+        print(f"Gradient Boosting ensemble model performance:")
         print(f"  Test Accuracy: {test_accuracy:.4f}")
         print(f"  Test AUC: {test_auc:.4f}")
         
@@ -241,12 +311,12 @@ class EnsemblePipeline:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         # Save ensemble model
-        model_filename = f"ensemble_model_{timestamp}.pkl"
+        model_filename = f"gradient_boosting_ensemble_model_{timestamp}.pkl"
         model_path = os.path.join(output_dir, model_filename)
         
         with open(model_path, 'wb') as f:
             pickle.dump(self.ensemble_model, f)
-        print(f"Ensemble model saved to: {model_path}")
+        print(f"Gradient Boosting ensemble model saved to: {model_path}")
         
         # Save results
         results_filename = f"ensemble_results_{timestamp}.json"
@@ -268,7 +338,7 @@ class EnsemblePipeline:
         
         # Print detailed results
         print("\n" + "="*50)
-        print("ENSEMBLE MODEL RESULTS")
+        print("GRADIENT BOOSTING ENSEMBLE MODEL RESULTS")
         print("="*50)
         print(f"Accuracy: {test_results['accuracy']:.4f}")
         print(f"AUC: {test_results['auc']:.4f}")
@@ -295,13 +365,13 @@ class EnsemblePipeline:
         print(f"Backbone: {self.backbone}")
         
         # Step 1: Apply model to training data
-        train_results_df = self.apply_model_to_training_data(training_filepath)
+        train_results_df = self.apply_model_to_training_data_with_progress(training_filepath, "Training")
         
         # Step 2: Add traditional features to training data
         train_results_df = self.add_traditional_features(train_results_df)
         
         # Step 3: Apply model to test data
-        test_results_df = self.apply_model_to_training_data(test_filepath)
+        test_results_df = self.apply_model_to_training_data_with_progress(test_filepath, "Test")
         test_results_df = self.add_traditional_features(test_results_df)
         
         # Step 4: Train ensemble model using training data only

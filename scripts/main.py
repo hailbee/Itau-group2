@@ -78,10 +78,6 @@ def main():
                       help='Path to the saved .pt model file (default: log_dir/best_model_siglip_pair.pt)')
     parser.add_argument('--ensemble_output_dir', type=str, default='ensemble_results',
                       help='Directory to save ensemble results (default: ensemble_results)')
-    parser.add_argument('--ensemble_test_size', type=float, default=0.2,
-                      help='Fraction of data to use for testing in ensemble mode (default: 0.2)')
-    parser.add_argument('--ensemble_random_state', type=int, default=42,
-                      help='Random seed for ensemble data splitting (default: 42)')
 
     args = parser.parse_args()
 
