@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--mode', type=str, 
                       choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline', 'evaluate_saved', 'ensemble'], 
                       required=True,
-                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, baseline, evaluate_saved, or ensemble')
+                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, baseline, evaluate_saved, or ensemble (combines pre-trained model with fuzzy string matching)')
     parser.add_argument('--training_filepath', type=str,
                       help='Path to training data (for training modes)')
     parser.add_argument('--test_filepath', type=str, required=True,
@@ -400,7 +400,7 @@ def main():
         print(f"\nComparison results saved to: {args.log_dir}")
 
     elif args.mode == 'ensemble':
-        # Ensemble mode - combine pre-trained model with traditional features
+        # Ensemble mode - combine pre-trained model with fuzzy string matching features
         print("Running ensemble mode...")
         
         # Validate required arguments for ensemble mode

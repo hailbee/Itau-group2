@@ -9,7 +9,6 @@ Following the pipeline directions:
 4. Get and save results (ROC_AUC, accuracy, etc.)
 """
 
-import argparse
 import torch
 import pandas as pd
 import numpy as np
@@ -20,6 +19,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 import pickle
+
+# Import fuzzy string matching libraries
+from fuzzywuzzy import fuzz
+import Levenshtein
 
 # Import existing utilities
 from scripts.evaluation.evaluator import Evaluator
@@ -74,38 +77,19 @@ class EnsemblePipeline:
         
     def compute_levenshtein_distance(self, str1, str2):
         """Compute Levenshtein distance between two strings."""
-        m, n = len(str1), len(str2)
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
-        
-        for i in range(m + 1):
-            dp[i][0] = i
-        for j in range(n + 1):
-            dp[0][j] = j
-            
-        for i in range(1, m + 1):
-            for j in range(1, n + 1):
-                if str1[i-1] == str2[j-1]:
-                    dp[i][j] = dp[i-1][j-1]
-                else:
-                    dp[i][j] = min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1
-                    
-        return dp[m][n]
+        return Levenshtein.distance(str1, str2)
     
     def compute_token_set_ratio(self, str1, str2):
-        """Compute token set ratio (Jaccard similarity) between two strings."""
-        # Convert to lowercase and split into tokens
-        tokens1 = set(str1.lower().split())
-        tokens2 = set(str2.lower().split())
-        
-        if not tokens1 and not tokens2:
-            return 1.0
-        if not tokens1 or not tokens2:
-            return 0.0
-            
-        intersection = len(tokens1.intersection(tokens2))
-        union = len(tokens1.union(tokens2))
-        
-        return intersection / union
+        """Compute token set ratio using fuzzywuzzy library."""
+        return fuzz.token_set_ratio(str1, str2) / 100.0  # Convert to 0-1 scale
+    
+    def compute_partial_ratio(self, str1, str2):
+        """Compute partial ratio using fuzzywuzzy library."""
+        return fuzz.partial_ratio(str1, str2) / 100.0  # Convert to 0-1 scale
+    
+    def compute_token_sort_ratio(self, str1, str2):
+        """Compute token sort ratio using fuzzywuzzy library."""
+        return fuzz.token_sort_ratio(str1, str2) / 100.0  # Convert to 0-1 scale
     
     def apply_model_to_training_data(self, training_filepath):
         """
@@ -132,7 +116,7 @@ class EnsemblePipeline:
     
     def add_traditional_features(self, results_df):
         """
-        Step 2: Add lev_dist and ratio as columns to results_df.
+        Step 2: Add fuzzy string matching features to results_df.
         
         Args:
             results_df: DataFrame with model results
@@ -140,7 +124,7 @@ class EnsemblePipeline:
         Returns:
             DataFrame with additional features
         """
-        print("Adding traditional features (lev_dist and ratio)...")
+        print("Adding fuzzy string matching features...")
         
         # Add Levenshtein distance
         results_df['lev_dist'] = results_df.apply(
@@ -150,15 +134,31 @@ class EnsemblePipeline:
         )
         
         # Add token set ratio
-        results_df['ratio'] = results_df.apply(
+        results_df['token_set_ratio'] = results_df.apply(
             lambda row: self.compute_token_set_ratio(
+                str(row['fraudulent_name']), str(row['real_name'])
+            ), axis=1
+        )
+        
+        # Add partial ratio
+        results_df['partial_ratio'] = results_df.apply(
+            lambda row: self.compute_partial_ratio(
+                str(row['fraudulent_name']), str(row['real_name'])
+            ), axis=1
+        )
+        
+        # Add token sort ratio
+        results_df['token_sort_ratio'] = results_df.apply(
+            lambda row: self.compute_token_sort_ratio(
                 str(row['fraudulent_name']), str(row['real_name'])
             ), axis=1
         )
         
         print(f"Added features for {len(results_df)} samples")
         print(f"Levenshtein distance range: [{results_df['lev_dist'].min()}, {results_df['lev_dist'].max()}]")
-        print(f"Token set ratio range: [{results_df['ratio'].min():.3f}, {results_df['ratio'].max():.3f}]")
+        print(f"Token set ratio range: [{results_df['token_set_ratio'].min():.3f}, {results_df['token_set_ratio'].max():.3f}]")
+        print(f"Partial ratio range: [{results_df['partial_ratio'].min():.3f}, {results_df['partial_ratio'].max():.3f}]")
+        print(f"Token sort ratio range: [{results_df['token_sort_ratio'].min():.3f}, {results_df['token_sort_ratio'].max():.3f}]")
         
         return results_df
     
@@ -177,7 +177,8 @@ class EnsemblePipeline:
         print("Training ensemble model (Random Forest) on 3 features...")
         
         # Prepare features
-        X = results_df[['max_similarity', 'ratio', 'lev_dist']].values
+        feature_columns = ['max_similarity', 'token_set_ratio', 'lev_dist', 'partial_ratio', 'token_sort_ratio']
+        X = results_df[feature_columns].values
         y = results_df['label'].values
         
         # Split data
@@ -210,7 +211,7 @@ class EnsemblePipeline:
         print(f"  Test AUC: {test_auc:.4f}")
         
         # Feature importance
-        feature_importance = dict(zip(['max_similarity', 'ratio', 'lev_dist'], 
+        feature_importance = dict(zip(feature_columns, 
                                     self.ensemble_model.feature_importances_))
         print(f"Feature importance: {feature_importance}")
         
@@ -306,52 +307,4 @@ class EnsemblePipeline:
         print("Ensemble pipeline completed successfully!")
         return final_results
 
-def main():
-    """Main function to run the ensemble pipeline."""
-    parser = argparse.ArgumentParser(description='Ensemble Pipeline for Homoglyph Detection')
-    parser.add_argument('--model_path', type=str, required=True,
-                      help='Path to the saved .pt model file')
-    parser.add_argument('--training_filepath', type=str, required=True,
-                      help='Path to training data file')
-    parser.add_argument('--backbone', type=str, default='siglip',
-                      choices=['clip', 'siglip', 'coca', 'flava'],
-                      help='Backbone model type')
-    parser.add_argument('--batch_size', type=int, default=32,
-                      help='Batch size for processing')
-    parser.add_argument('--output_dir', type=str, default='ensemble_results',
-                      help='Directory to save results')
-    
-    args = parser.parse_args()
-    
-    # Check if model file exists
-    if not os.path.exists(args.model_path):
-        print(f"Error: Model file not found at {args.model_path}")
-        return
-    
-    # Check if training file exists
-    if not os.path.exists(args.training_filepath):
-        print(f"Error: Training file not found at {args.training_filepath}")
-        return
-    
-    # Run the pipeline
-    try:
-        pipeline = EnsemblePipeline(
-            model_path=args.model_path,
-            backbone=args.backbone,
-            batch_size=args.batch_size
-        )
-        
-        results = pipeline.run_pipeline(
-            training_filepath=args.training_filepath,
-            output_dir=args.output_dir
-        )
-        
-        print(f"\nPipeline completed successfully!")
-        print(f"Results saved to: {args.output_dir}")
-        
-    except Exception as e:
-        print(f"Error running pipeline: {str(e)}")
-        raise
 
-if __name__ == "__main__":
-    main()
