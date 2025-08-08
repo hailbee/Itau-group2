@@ -16,6 +16,10 @@ class EmbeddingExtractor(nn.Module):
     def forward(self, texts):
         # Use the siamese model's encode method which handles the backbone and projection
         return self.siamese_model.encode(texts)
+    
+    def encode(self, texts):
+        # Alias for forward method to maintain compatibility
+        return self.forward(texts)
 
 class SupConEmbeddingExtractor(nn.Module):
     """
@@ -29,6 +33,10 @@ class SupConEmbeddingExtractor(nn.Module):
         # For evaluation, we just need to encode the texts normally
         # Use the siamese model's encode method which handles the backbone and projection
         return self.siamese_model.encode(texts)
+    
+    def encode(self, texts):
+        # Alias for forward method to maintain compatibility
+        return self.forward(texts)
 
 def batched_embedding(extractor, names, batch_size=32):
     embeddings = []
