@@ -40,8 +40,11 @@ class Evaluator:
         else:
             fpr, tpr, thresholds = roc_curve(y_true, y_scores)
             roc_auc = auc(fpr, tpr)
+
+        # Use the ROC curve thresholds for both calculations to avoid redundant computation
         youden_thresh = find_best_threshold_youden(fpr, tpr, thresholds)
-        best_acc, best_acc_threshold = find_best_threshold_accuracy(y_true, y_scores, thresholds if thresholds is not None else np.linspace(0, 1, 100))
+        best_acc, best_acc_threshold = find_best_threshold_accuracy(y_true, y_scores, thresholds)
+        
         y_pred = (y_scores > youden_thresh).astype(int)
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),

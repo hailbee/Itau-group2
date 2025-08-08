@@ -25,7 +25,12 @@ class UnifiedHyperparameterOptimizer:
         self.best_auc = 0.0  # Track best AUC across all trials
         self.best_accuracy = 0.0  # Track best accuracy across all trials
         
-        # Create main log directory
+        # Create main log directory - use local path if log_dir contains /content
+        if "/content" in self.log_dir:
+            self.log_dir = "optimization_results"
+        # Also check if the path starts with /content
+        if self.log_dir.startswith("/content"):
+            self.log_dir = "optimization_results"
         os.makedirs(self.log_dir, exist_ok=True)
         
         # Initialize different optimizers

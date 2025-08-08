@@ -31,10 +31,18 @@ class SiameseModelInfoNCE(BaseSiameseModel):
         batch_size = len(anchor_text)
         n_negatives = len(negative_texts[0]) if negative_texts else 0
         
+        # Debug: Check negative texts structure
+        print(f"[DEBUG] InfoNCE forward: batch_size={batch_size}, n_negatives={n_negatives}")
+        print(f"[DEBUG] InfoNCE forward: negative_texts type={type(negative_texts)}, length={len(negative_texts)}")
+        if negative_texts and len(negative_texts) > 0:
+            print(f"[DEBUG] InfoNCE forward: first negative list type={type(negative_texts[0])}, length={len(negative_texts[0])}")
+        
         # Flatten all negatives for batch encoding
         flat_negatives = []
         for neg_list in negative_texts:
             flat_negatives.extend(neg_list)
+        
+        print(f"[DEBUG] InfoNCE forward: flat_negatives length={len(flat_negatives)}")
         
         # Encode all negatives at once
         z_negatives_flat = self.encode(flat_negatives)  # [batch_size * n_negatives, emb_dim]

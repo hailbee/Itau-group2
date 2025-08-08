@@ -255,4 +255,4 @@ class GridSearcher:
             num_workers = 4
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=infonce_collate_fn)
         else:
-            raise ValueError(f"Unknown mode: {mode}") 
+            raise ValueError(f"Unknown mode: {mode}")

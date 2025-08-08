@@ -24,7 +24,7 @@ def main():
                       help='Model type: pair, triplet, supcon, or infonce')
     parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
                       help='Loss function type')
-    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'align', 'all'], default='clip',
+    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'siglip', 'openclip', 'all'], default='clip',
                       help='Baseline model to test (for baseline mode)')
     parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip'], default='clip',
                       help='Vision-language backbone to use (clip, siglip, flava, etc.)')
@@ -112,7 +112,7 @@ def main():
         else:
             print(f"Testing {args.baseline_model.upper()} baseline model...")
             tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_filepath, plot=args.plot)
+            results_df, metrics = tester.test(args.test_filepath)
             print(f"\n{args.baseline_model.upper()} Baseline Results:")
             metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
             print(metrics_to_print)
@@ -125,7 +125,7 @@ def main():
         backbone_module = tester.model_wrapper  # must have .encode_text
         
         # Load your model with matching dimensions
-        model = SiameseModelPairs(embedding_dim=768, projection_dim=256, backbone=backbone_module).to(device)
+        model = SiameseModelPairs(embedding_dim=768, projection_dim=768, backbone=backbone_module).to(device)
 
         # Load saved weights
         state_dict = torch.load(args.log_dir + "/best_model_siglip_pair.pt", map_location=device)
@@ -140,6 +140,45 @@ def main():
         for k, v in metrics.items():
             if k != 'roc_curve':
                 print(f"{k}: {v}")
+        
+        # Save results_df to computer
+        import pandas as pd
+        from datetime import datetime
+        import os
+        
+        # Create output directory if it doesn't exist
+        output_dir = "evaluation_results"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"evaluation_results_{timestamp}.csv"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Save results_df to CSV
+        results_df.to_csv(filepath, index=False)
+        print(f"\nResults saved to: {filepath}")
+        
+        # Also save metrics to a separate file
+        metrics_filename = f"evaluation_metrics_{timestamp}.json"
+        metrics_filepath = os.path.join(output_dir, metrics_filename)
+        
+        import json
+        # Convert numpy types to Python types for JSON serialization
+        def convert_np(obj):
+            if isinstance(obj, dict):
+                return {k: convert_np(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_np(v) for v in obj]
+            elif hasattr(obj, 'item') and callable(obj.item):
+                return obj.item()
+            else:
+                return obj
+        
+        metrics_serializable = convert_np(metrics)
+        with open(metrics_filepath, 'w') as f:
+            json.dump(metrics_serializable, f, indent=2)
+        print(f"Metrics saved to: {metrics_filepath}")
 
     elif args.mode == 'train':
         # Single training run

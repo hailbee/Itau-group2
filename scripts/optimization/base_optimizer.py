@@ -27,7 +27,9 @@ class BaseOptimizer:
         self.best_auc = 0.0
         self.best_accuracy = 0.0
         
-        # Create log directory if it doesn't exist
+        # Create log directory if it doesn't exist - use local path if log_dir contains /content
+        if "/content" in self.log_dir:
+            self.log_dir = "optimization_results"
         os.makedirs(self.log_dir, exist_ok=True)
         
         # Create a sample model to get embedding dimension
@@ -125,25 +127,25 @@ class BaseOptimizer:
             from utils.data import TextPairDataset
             dataset = TextPairDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 16
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "triplet":
             from utils.data import TripletDataset
             dataset = TripletDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         elif mode == "supcon":
             from utils.data import SupConDataset, supcon_collate_fn
             dataset = SupConDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=supcon_collate_fn)
         elif mode == "infonce":
             from utils.data import InfoNCEDataset, infonce_collate_fn
             dataset = InfoNCEDataset(dataframe)
             from torch.utils.data import DataLoader
-            num_workers = 4
+            num_workers = 12
             return DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=infonce_collate_fn)
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -185,6 +187,8 @@ class BaseOptimizer:
             
             # Sample weight decay
             weight_decay = np.exp(np.random.uniform(np.log(1e-6), np.log(1e-3)))
+            
+
             
             if mode in ["supcon", "infonce"]:
                 # Sample temperature (log-uniform)
@@ -341,6 +345,9 @@ class BaseOptimizer:
                 self.best_auc = best_metrics['roc_auc']
                 self.best_accuracy = best_metrics['accuracy']
                 model_id = f"{self.model_type}_{mode}"
+                # Include curriculum in filename if specified
+                if curriculum:
+                    model_id += f"_{curriculum}"
                 torch.save(model.state_dict(), os.path.join(self.log_dir, f'best_model_{model_id}.pt'))
                 with open(os.path.join(self.log_dir, f'best_hparams_{model_id}.json'), 'w') as f:
                     json.dump(convert_np(params), f)

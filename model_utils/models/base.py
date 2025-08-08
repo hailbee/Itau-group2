@@ -9,6 +9,8 @@ class BaseSiameseModel(nn.Module):
     def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
         super().__init__()
         self.backbone = backbone  # Model wrapper (CLIP, FLAVA, etc.)
+        
+        # Projector without dropout layers
         self.projector = nn.Sequential(
             nn.Linear(embedding_dim, projection_dim),
             nn.ReLU(),
@@ -27,6 +29,7 @@ class BaseSiameseModel(nn.Module):
         """
         features = self.backbone.encode_text(texts)
         z = self.projector(features)
+        
         return F.normalize(z, dim=1)
     
     def to(self, device):

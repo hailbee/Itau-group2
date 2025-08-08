@@ -32,6 +32,8 @@ class InfoNCELoss(nn.Module):
         anchor = F.normalize(anchor, dim=1)
         positives = F.normalize(positives, dim=2)
         negatives = F.normalize(negatives, dim=2)
+
+        print(f"[DEBUG] InfoNCELoss forward: anchor shape={anchor.shape}, positives shape={positives.shape}, negatives shape={negatives.shape}")
         
         # Compute similarities between anchor and positives
         pos_similarities = torch.bmm(

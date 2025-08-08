@@ -42,9 +42,11 @@ class OptunaOptimizer(BaseOptimizer):
             float: Objective value (accuracy)
         """
         # Suggest hyperparameters
-        lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
-        internal_layer_size = trial.suggest_categorical("internal_layer_size", [64, 128, 256, 512])
+        lr = trial.suggest_float("lr", 2e-5, 2e-5, log=True)
+        batch_size = trial.suggest_categorical("batch_size", [64])
+        internal_layer_size = trial.suggest_categorical("internal_layer_size", [768])
+        
+
         
         params = {}
         
@@ -52,20 +54,21 @@ class OptunaOptimizer(BaseOptimizer):
             temperature = trial.suggest_float("temperature", 0.01, 1.0, log=True)
             params['temperature'] = temperature
         else:
-            margin = trial.suggest_float("margin", 0.2, 1.0)
+            margin = trial.suggest_float("margin", 0.1293, 0.1293)
             params['margin'] = margin
         
         # Optional: suggest optimizer
         optimizer_name = trial.suggest_categorical("optimizer", ["adam"])
        
         # Optional: suggest weight decay
-        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-5, log=True)
         
         # Create parameter dictionary
         params.update({
             'lr': lr,
             'batch_size': batch_size,
             'internal_layer_size': internal_layer_size,
+
             'optimizer': optimizer_name,
             'weight_decay': weight_decay
         })
@@ -166,6 +169,9 @@ class OptunaOptimizer(BaseOptimizer):
         print("[DEBUG] FINAL COMPARISON: Evaluating best model on test set after all Optuna trials...")
         print("="*60 + "\n")
         model_id = f"{self.model_type}_{mode}"
+        # Include curriculum in filename if specified
+        if curriculum:
+            model_id += f"_{curriculum}"
         best_model_path = os.path.join(self.log_dir, f'best_model_{model_id}.pt')
         best_hparams_path = os.path.join(self.log_dir, f'best_hparams_{model_id}.json')
         

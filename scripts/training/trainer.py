@@ -22,9 +22,12 @@ class Trainer:
         self.model_type = model_type
         self.model.to(device)
         self.evaluator = Evaluator(model, model_type=model_type)
+        
+        # Debug: Print learning rate info
+        print(f"[DEBUG] Using fixed learning rate: {optimizer.param_groups[0]['lr']:.6f}")
 
 
-    def train_epoch(self, dataloader, mode="pair", track_pg = False):
+    def train_epoch(self, dataloader, mode="pair", track_pg = False, epoch_num=None):
         """Train for one epoch"""
         self.model.train()
         epoch_loss = 0.0
@@ -59,9 +62,11 @@ class Trainer:
             epoch_loss += loss.item()
 
             if i % 100 == 0:
-                print(f"Step {i} complete out of {len(dataloader)}")
+                current_lr = self.optimizer.param_groups[0]['lr']
+                print(f"Step {i} complete out of {len(dataloader)} | LR: {current_lr:.6f}")
 
         avg_pg = total_pg/pg_count if track_pg and pg_count > 0 else None
+        
         return epoch_loss / len(dataloader), avg_pg
 
 
@@ -132,7 +137,20 @@ class Trainer:
                     Subset(dataloader.dataset, hard_idx)
                 ])
 
-                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True)
+                # Preserve the collate_fn from the original dataloader
+                collate_fn = getattr(dataloader, 'collate_fn', None)
+                current_loader = DataLoader(mixed_dataset, batch_size=dataloader.batch_size, shuffle=True, collate_fn=collate_fn)
+                
+                # Debug: Check the first batch to see if data format is correct
+                if self.model_type == "infonce":
+                    try:
+                        first_batch = next(iter(current_loader))
+                        print(f"[DEBUG] First batch types: {type(first_batch[0])}, {type(first_batch[1])}, {type(first_batch[2])}")
+                        print(f"[DEBUG] First batch lengths: {len(first_batch[0])}, {len(first_batch[1])}, {len(first_batch[2])}")
+                        if len(first_batch[2]) > 0:
+                            print(f"[DEBUG] First negative list length: {len(first_batch[2][0])}")
+                    except Exception as e:
+                        print(f"[DEBUG] Error checking first batch: {e}")
                 curriculum_debug_info = {
                     'epoch': epoch+1,
                     'easy_n': easy_n,
@@ -161,10 +179,13 @@ class Trainer:
                 else:
                    chosen = max(avg_rewards, key=avg_rewards.get)
 
+                # Preserve the collate_fn from the original dataloader
+                collate_fn = getattr(dataloader, 'collate_fn', None)
                 current_loader = DataLoader(
                     datasets[chosen],
                     batch_size=dataloader.batch_size,
-                    shuffle=True
+                    shuffle=True,
+                    collate_fn=collate_fn
                 )
                 curriculum_debug_info = {
                     'epoch': epoch+1,
@@ -188,7 +209,7 @@ class Trainer:
                     print(f"[DEBUG][Manual Curriculum] Epoch {epoch+1}: Using HARD dataset")
                 curriculum_debug_info = None
 
-            avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"))            
+            avg_loss, avg_pg = self.train_epoch(current_loader, track_pg = (curriculum == "bandit"), epoch_num=epoch+1)            
             print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}")
 
             if avg_loss < best_epoch_loss:
