@@ -13,9 +13,9 @@ from model_utils.models.learning.infonce import SiameseModelInfoNCE
 def main():
     parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
     parser.add_argument('--mode', type=str, 
-                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline', 'evaluate_saved'], 
+                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline', 'evaluate_saved', 'ensemble'], 
                       required=True,
-                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, or baseline (supports multiple vision-language models)')
+                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, baseline, evaluate_saved, or ensemble (combines pre-trained model with fuzzy string matching)')
     parser.add_argument('--training_filepath', type=str,
                       help='Path to training data (for training modes)')
     parser.add_argument('--test_filepath', type=str, required=True,
@@ -72,6 +72,12 @@ def main():
                       help='Pruner for Optuna optimization')
     parser.add_argument('--study_name', type=str,
                       help='Study name for Optuna optimization')
+    
+    # Ensemble mode parameters
+    parser.add_argument('--model_path', type=str, default=None,
+                      help='Path to the saved .pt model file (default: log_dir/best_model_siglip_pair.pt)')
+    parser.add_argument('--ensemble_output_dir', type=str, default='ensemble_results',
+                      help='Directory to save ensemble results (default: ensemble_results)')
 
     args = parser.parse_args()
 
@@ -388,6 +394,53 @@ def main():
         )
         
         print(f"\nComparison results saved to: {args.log_dir}")
+
+    elif args.mode == 'ensemble':
+        # Ensemble mode - combine pre-trained model with fuzzy string matching features
+        print("Running ensemble mode...")
+        
+        # Validate required arguments for ensemble mode
+        if not args.training_filepath:
+            print("Error: --training_filepath is required for ensemble mode")
+            return
+        
+        if not args.test_filepath:
+            print("Error: --test_filepath is required for ensemble mode")
+            return
+        
+        # Use same default model path as evaluate_saved mode
+        if not args.model_path:
+            args.model_path = args.log_dir + "/best_model_siglip_pair.pt"
+            print(f"Using default model path: {args.model_path}")
+        
+        # Import ensemble pipeline
+        from scripts.ensemble_pipeline import EnsemblePipeline
+        
+        # Run ensemble pipeline
+        try:
+            pipeline = EnsemblePipeline(
+                model_path=args.model_path,
+                backbone=args.backbone,
+                batch_size=args.batch_size
+            )
+            
+            # Run the pipeline
+            results = pipeline.run_pipeline(
+                training_filepath=args.training_filepath,
+                test_filepath=args.test_filepath,
+                output_dir=args.ensemble_output_dir
+            )
+            
+            print(f"\nEnsemble pipeline completed successfully!")
+            print(f"Results saved to: {args.ensemble_output_dir}")
+            print(f"Accuracy: {results['accuracy']:.4f}")
+            print(f"AUC: {results['auc']:.4f}")
+            
+        except Exception as e:
+            print(f"Error running ensemble pipeline: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return
 
 if __name__ == '__main__':
     main() 
