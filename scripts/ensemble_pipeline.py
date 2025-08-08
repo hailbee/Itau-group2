@@ -23,7 +23,15 @@ from tqdm import tqdm
 
 # Import fuzzy string matching libraries
 from fuzzywuzzy import fuzz
-import Levenshtein
+
+# Try to import python-Levenshtein for faster computation
+try:
+    import Levenshtein
+    LEVENSHTEIN_AVAILABLE = True
+except ImportError:
+    LEVENSHTEIN_AVAILABLE = False
+    print("Warning: python-Levenshtein not available. Install with: pip install python-Levenshtein")
+    print("Using fallback implementation for Levenshtein distance.")
 
 # Import existing utilities
 from scripts.evaluation.evaluator import Evaluator
@@ -78,7 +86,26 @@ class EnsemblePipeline:
         
     def compute_levenshtein_distance(self, str1, str2):
         """Compute Levenshtein distance between two strings."""
-        return Levenshtein.distance(str1, str2)
+        if LEVENSHTEIN_AVAILABLE:
+            return Levenshtein.distance(str1, str2)
+        else:
+            # Fallback to manual implementation
+            m, n = len(str1), len(str2)
+            dp = [[0] * (n + 1) for _ in range(m + 1)]
+            
+            for i in range(m + 1):
+                dp[i][0] = i
+            for j in range(n + 1):
+                dp[0][j] = j
+                
+            for i in range(1, m + 1):
+                for j in range(1, n + 1):
+                    if str1[i-1] == str2[j-1]:
+                        dp[i][j] = dp[i-1][j-1]
+                    else:
+                        dp[i][j] = min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1
+                        
+            return dp[m][n]
     
     def compute_token_set_ratio(self, str1, str2):
         """Compute token set ratio using fuzzywuzzy library."""
@@ -381,6 +408,17 @@ class EnsemblePipeline:
         final_results = self.evaluate_and_save_results(test_results, output_dir)
         
         print("Ensemble pipeline completed successfully!")
+        
+        # Print performance note if packages are missing
+        if not LEVENSHTEIN_AVAILABLE:
+            print("\n" + "="*60)
+            print("PERFORMANCE NOTE")
+            print("="*60)
+            print("For better performance, install python-Levenshtein:")
+            print("pip install python-Levenshtein")
+            print("This will speed up Levenshtein distance computation significantly.")
+            print("="*60)
+        
         return final_results
 
 
