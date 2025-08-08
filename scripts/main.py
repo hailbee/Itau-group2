@@ -74,8 +74,8 @@ def main():
                       help='Study name for Optuna optimization')
     
     # Ensemble mode parameters
-    parser.add_argument('--model_path', type=str,
-                      help='Path to the saved .pt model file (required for ensemble mode)')
+    parser.add_argument('--model_path', type=str, default=None,
+                      help='Path to the saved .pt model file (default: log_dir/best_model_siglip_pair.pt)')
     parser.add_argument('--ensemble_output_dir', type=str, default='ensemble_results',
                       help='Directory to save ensemble results (default: ensemble_results)')
     parser.add_argument('--ensemble_test_size', type=float, default=0.2,
@@ -404,13 +404,14 @@ def main():
         print("Running ensemble mode...")
         
         # Validate required arguments for ensemble mode
-        if not args.model_path:
-            print("Error: --model_path is required for ensemble mode")
-            return
-        
         if not args.training_filepath:
             print("Error: --training_filepath is required for ensemble mode")
             return
+        
+        # Use same default model path as evaluate_saved mode
+        if not args.model_path:
+            args.model_path = args.log_dir + "/best_model_siglip_pair.pt"
+            print(f"Using default model path: {args.model_path}")
         
         # Import ensemble pipeline
         from scripts.ensemble_pipeline import EnsemblePipeline
