@@ -177,7 +177,7 @@ class EnsemblePipeline:
         print("Training ensemble model (Random Forest) on 3 features...")
         
         # Prepare features
-        feature_columns = ['max_similarity', 'token_set_ratio', 'lev_dist', 'partial_ratio', 'token_sort_ratio']
+        feature_columns = ['max_similarity', 'token_set_ratio', 'lev_dist']
         X = results_df[feature_columns].values
         y = results_df['label'].values
         
