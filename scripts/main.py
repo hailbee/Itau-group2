@@ -408,6 +408,10 @@ def main():
             print("Error: --training_filepath is required for ensemble mode")
             return
         
+        if not args.test_filepath:
+            print("Error: --test_filepath is required for ensemble mode")
+            return
+        
         # Use same default model path as evaluate_saved mode
         if not args.model_path:
             args.model_path = args.log_dir + "/best_model_siglip_pair.pt"
@@ -427,6 +431,7 @@ def main():
             # Run the pipeline
             results = pipeline.run_pipeline(
                 training_filepath=args.training_filepath,
+                test_filepath=args.test_filepath,
                 output_dir=args.ensemble_output_dir
             )
             

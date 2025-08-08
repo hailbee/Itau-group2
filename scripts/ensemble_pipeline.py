@@ -162,37 +162,37 @@ class EnsemblePipeline:
         
         return results_df
     
-    def train_ensemble_model(self, results_df, test_size=0.2, random_state=42):
+
+    
+    def train_ensemble_model_with_test(self, train_results_df, test_results_df):
         """
-        Step 3: Train XGBoost/Random Forest on the 3 features (max_sim, ratio, lev_dist).
+        Train ensemble model using separate training and test data.
         
         Args:
-            results_df: DataFrame with all features
-            test_size: Fraction of data to use for testing
-            random_state: Random seed for reproducibility
+            train_results_df: DataFrame with training data and features
+            test_results_df: DataFrame with test data and features
             
         Returns:
             Trained ensemble model and test results
         """
-        print("Training ensemble model (Random Forest) on 3 features...")
+        print("Training ensemble model with separate test data...")
         
-        # Prepare features
+        # Prepare training features
         feature_columns = ['max_similarity', 'token_set_ratio', 'lev_dist']
-        X = results_df[feature_columns].values
-        y = results_df['label'].values
+        X_train = train_results_df[feature_columns].values
+        y_train = train_results_df['label'].values
         
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=random_state, stratify=y
-        )
+        # Prepare test features
+        X_test = test_results_df[feature_columns].values
+        y_test = test_results_df['label'].values
         
         print(f"Training on {len(X_train)} samples, testing on {len(X_test)} samples")
         
-        # Train Random Forest (using Random Forest instead of XGBoost for simplicity)
+        # Train Random Forest
         self.ensemble_model = RandomForestClassifier(
             n_estimators=100,
             max_depth=10,
-            random_state=random_state,
+            random_state=42,
             n_jobs=-1
         )
         
@@ -279,29 +279,35 @@ class EnsemblePipeline:
         
         return results_data
     
-    def run_pipeline(self, training_filepath, output_dir="ensemble_results"):
+    def run_pipeline(self, training_filepath, test_filepath, output_dir="ensemble_results"):
         """
         Run the complete ensemble pipeline.
         
         Args:
             training_filepath: Path to training data
+            test_filepath: Path to test data
             output_dir: Directory to save results
         """
         print("Starting ensemble pipeline...")
         print(f"Model path: {self.model_path}")
         print(f"Training data: {training_filepath}")
+        print(f"Test data: {test_filepath}")
         print(f"Backbone: {self.backbone}")
         
         # Step 1: Apply model to training data
-        results_df = self.apply_model_to_training_data(training_filepath)
+        train_results_df = self.apply_model_to_training_data(training_filepath)
         
-        # Step 2: Add traditional features
-        results_df = self.add_traditional_features(results_df)
+        # Step 2: Add traditional features to training data
+        train_results_df = self.add_traditional_features(train_results_df)
         
-        # Step 3: Train ensemble model
-        test_results = self.train_ensemble_model(results_df)
+        # Step 3: Apply model to test data
+        test_results_df = self.apply_model_to_training_data(test_filepath)
+        test_results_df = self.add_traditional_features(test_results_df)
         
-        # Step 4: Evaluate and save results
+        # Step 4: Train ensemble model using training data only
+        test_results = self.train_ensemble_model_with_test(train_results_df, test_results_df)
+        
+        # Step 5: Evaluate and save results
         final_results = self.evaluate_and_save_results(test_results, output_dir)
         
         print("Ensemble pipeline completed successfully!")
