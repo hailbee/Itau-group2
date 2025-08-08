@@ -1,32 +1,6 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay, accuracy_score, precision_score
-
-def find_best_threshold_precision(y_true, y_scores, thresholds):
-    """
-    Finds the best threshold that yields the highest precision.
-
-    Args:
-        y_true (list or np.ndarray): Ground truth binary labels.
-        y_scores (list or np.ndarray): Predicted similarity scores.
-        thresholds (list or np.ndarray): Thresholds to test.
-
-    Returns:
-        float: Best precision
-        float: Threshold that gives best precision
-    """
-    best_prec = 0
-    best_prec_threshold = 0
-
-    for t in thresholds:
-        y_pred = (y_scores > t).astype(int)
-        prec = precision_score(y_true, y_pred, zero_division=0)
-        if prec > best_prec:
-            best_prec = prec
-            best_prec_threshold = t
-
-    print(f"Best Precision: {best_prec:.4f} at Threshold: {best_prec_threshold:.3f}")
-    return best_prec, best_prec_threshold
-
+import numpy as np
 
 def plot_roc_curve(results_df):
     """
@@ -62,10 +36,13 @@ def find_best_threshold_youden(fpr, tpr, thresholds):
     Finds the best threshold based on Youden's J statistic (TPR - FPR).
 
     Args:
-        results_df (pd.DataFrame): DataFrame containing 'label' and 'max_similarity'.
+        fpr (np.ndarray): False positive rates from ROC curve
+        tpr (np.ndarray): True positive rates from ROC curve  
+        thresholds (np.ndarray): Thresholds from ROC curve
     Returns:
         float: Best threshold maximizing TPR - FPR.
     """
+    # Vectorized computation of Youden's J statistic
     youden_index = tpr - fpr
     best_idx = youden_index.argmax()
     best_threshold = thresholds[best_idx]
@@ -95,49 +72,41 @@ def plot_confusion_matrix(y_true, y_scores, threshold):
 
 def find_best_threshold_accuracy(y_true, y_scores, thresholds):
     """
-    Finds the best threshold that yields the highest accuracy.
-
+    Finds the best threshold that yields the highest accuracy using vectorized operations.
+    
     Args:
-        results_df (pd.DataFrame): Must contain 'label' and 'max_similarity'.
+        y_true (np.ndarray): True labels
+        y_scores (np.ndarray): Predicted scores
+        thresholds (np.ndarray): Thresholds to evaluate
     Returns:
         float: Best accuracy
         float: Threshold that gives best accuracy
     """
-    best_acc = 0
-    best_acc_threshold = 0
-
-    for t in thresholds:
-        y_pred = (y_scores > t).astype(int)
-        acc = accuracy_score(y_true, y_pred)
-        if acc > best_acc:
-            best_acc = acc
-            best_acc_threshold = t
-
+    # Convert to numpy arrays for vectorized operations
+    y_true = np.asarray(y_true)
+    y_scores = np.asarray(y_scores)
+    thresholds = np.asarray(thresholds)
+    
+    # Filter out inf and nan values from thresholds
+    valid_mask = np.isfinite(thresholds)
+    if not np.any(valid_mask):
+        # If no valid thresholds, return default values
+        return 0.0, 0.0
+    
+    valid_thresholds = thresholds[valid_mask]
+    
+    # Vectorized computation: for each threshold, compute predictions for all samples at once
+    # Shape: (n_thresholds, n_samples)
+    predictions = (y_scores[:, None] > valid_thresholds[None, :]).astype(int)
+    
+    # Vectorized accuracy computation: compare predictions with true labels
+    # Shape: (n_thresholds,)
+    accuracies = np.mean(predictions == y_true[:, None], axis=0)
+    
+    # Find the best accuracy and corresponding threshold
+    best_idx = np.argmax(accuracies)
+    best_acc = accuracies[best_idx]
+    best_acc_threshold = valid_thresholds[best_idx]
+    
     print(f"Best Accuracy: {best_acc:.4f} at Threshold: {best_acc_threshold:.3f}")
     return best_acc, best_acc_threshold
-
-def find_best_threshold_precision(y_true, y_scores, thresholds):
-    """
-    Finds the best threshold that yields the highest precision.
-
-    Args:
-        y_true (list or np.ndarray): Ground truth binary labels.
-        y_scores (list or np.ndarray): Predicted similarity scores.
-        thresholds (list or np.ndarray): Thresholds to test.
-
-    Returns:
-        float: Best precision
-        float: Threshold that gives best precision
-    """
-    best_prec = 0
-    best_prec_threshold = 0
-
-    for t in thresholds:
-        y_pred = (y_scores > t).astype(int)
-        prec = precision_score(y_true, y_pred, zero_division=0)
-        if prec > best_prec:
-            best_prec = prec
-            best_prec_threshold = t
-
-    print(f"Best Precision: {best_prec:.4f} at Threshold: {best_prec_threshold:.3f}")
-    return best_prec, best_prec_threshold
