@@ -51,10 +51,10 @@ class OptunaOptimizer(BaseOptimizer):
         params = {}
         
         if mode in ["supcon", "infonce"]:
-            temperature = trial.suggest_float("temperature", 0.01, 1.0, log=True)
+            temperature = trial.suggest_float("temperature", 0.01, 0.1, log=True)
             params['temperature'] = temperature
         else:
-            margin = trial.suggest_float("margin", 0.1, 0.75)
+            margin = trial.suggest_float("margin", 0.05, 0.7)
             params['margin'] = margin
         
         # Optional: suggest optimizer
