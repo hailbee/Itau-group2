@@ -57,6 +57,7 @@ class PrecomputedEmbeddingModel:
                 if self.lowercase_keys:
                     word = word.lower()
                 vec = data[key]
+                vec = np.asarray(vec).squeeze()
                 if vec.ndim != 1:
                     raise ValueError(f"Embedding for key '{key}' in {p} must be 1D, got shape {vec.shape}")
                 if self.normalize:
