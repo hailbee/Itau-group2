@@ -95,7 +95,6 @@ class PrecomputedEmbeddingModel:
         return vec  # None if missing
 
 
-
 def load_pairs_dataframe(path: str, left_col: str, right_col: str, label_col: str) -> pd.DataFrame:
     ext = os.path.splitext(path)[-1].lower()
     if ext in (".parquet", ".pq"):
@@ -131,14 +130,6 @@ def compute_scores(
     vl_count = 0
     vr_count = 0
     for i, (l, r) in enumerate(zip(left, right)):
-        # vl = model.get_vector(l)
-        # if vl is None:
-        #     vl_count += 1
-        #     continue
-        # vr = model.get_vector(r)
-        # if vr is None:
-        #     vr_count += 1
-        #     continue
         vl = model.get_vector(l)
         vr = model.get_vector(r)
         if vl is None:
