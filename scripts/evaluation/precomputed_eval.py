@@ -31,9 +31,11 @@ class PrecomputedEmbeddingModel:
         self._store: Dict[str, np.ndarray] = {}
 
         for p in npz_paths:
+            # print(os.getcwd())
             data = np.load(p, allow_pickle=True)
             for key in data.files:
-                word = key.lower() if lowercase_keys else key
+                word = key.split(".")[0]
+                word = word.lower() if lowercase_keys else key
                 vec = data[key]
                 vec = np.asarray(vec).squeeze()
                 if vec.ndim != 1:
@@ -49,20 +51,49 @@ class PrecomputedEmbeddingModel:
 
         self.embedding_dim = int(next(iter(self._store.values())).shape[-1])
 
-    def encode(self, texts: Iterable[str]) -> torch.Tensor:
+    def encode(self, texts: Iterable[str]) -> Tuple[torch.Tensor, List[int]]:
+        """
+        Encode a sequence of texts and return only the embeddings that exist in the
+        precomputed store along with their positions in the input sequence.
+
+        Returns:
+            (embeddings, positions)
+            - embeddings: Tensor of shape [M, D] for the M found items
+            - positions: list of length M giving the index (0-based) within the
+              provided `texts` sequence for each returned embedding
+
+        Behavior:
+            - If `self.strict` is True, missing keys raise KeyError (unchanged).
+            - If `self.strict` is False, missing keys are skipped and not returned.
+        """
         out: List[torch.Tensor] = []
-        for t in texts:
+        positions: List[int] = []
+        for idx, t in enumerate(texts):
             key = t.lower() if self.lowercase_keys else t
             vec = self._store.get(key)
             if vec is None:
                 if self.strict:
                     raise KeyError(f"Missing embedding for word: {t!r}")
-                vec = np.zeros(self.embedding_dim, dtype=np.float32)
+                # non-strict: skip this entry entirely
+                continue
             out.append(torch.from_numpy(vec).unsqueeze(0))
-        result = torch.cat(out, dim=0)  # [N, D]
+            positions.append(int(idx))
+
+        if not out:
+            # return empty tensor and empty positions list
+            empty = torch.empty((0, self.embedding_dim), dtype=torch.float32)
+            return (empty, [])
+
+        result = torch.cat(out, dim=0)  # [M, D]
         if self.normalize:
             result = F.normalize(result, dim=1)
-        return result
+        return (result, positions)
+
+    def get_vector(self, word: str) -> np.ndarray | None:
+        key = word if not self.lowercase_keys else word.lower()
+        vec = self._store.get(key)
+        return vec  # None if missing
+
 
 
 def load_pairs_dataframe(path: str, left_col: str, right_col: str, label_col: str) -> pd.DataFrame:
@@ -84,18 +115,49 @@ def compute_scores(
     model: PrecomputedEmbeddingModel,
     left: List[str],
     right: List[str],
-    batch_size: int,
-) -> np.ndarray:
-    """Return cosine similarities for each (left_i, right_i) pair."""
-    # Since vectors are normalized, cosine == dot product
-    sims = np.empty(len(left), dtype=np.float32)
+    batch_size: int,  # kept for signature compatibility; unused now
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Returns:
+      scores: [N] float32, NaN where invalid
+      valid_mask: [N] bool, True when both words had embeddings
+    """
+    assert len(left) == len(right)
     N = len(left)
-    for i in range(0, N, batch_size):
-        j = min(i + batch_size, N)
-        L = model.encode(left[i:j]).numpy()   # [B, D]
-        R = model.encode(right[i:j]).numpy()  # [B, D]
-        sims[i:j] = np.einsum("bd,bd->b", L, R)  # batched dot product
-    return sims
+    scores = np.full(N, np.nan, dtype=np.float32)
+    valid = np.zeros(N, dtype=bool)
+
+    # direct dictionary lookups; no torch needed
+    vl_count = 0
+    vr_count = 0
+    for i, (l, r) in enumerate(zip(left, right)):
+        # vl = model.get_vector(l)
+        # if vl is None:
+        #     vl_count += 1
+        #     continue
+        # vr = model.get_vector(r)
+        # if vr is None:
+        #     vr_count += 1
+        #     continue
+        vl = model.get_vector(l)
+        vr = model.get_vector(r)
+        if vl is None:
+            vl_count += 1
+        if vr is None:
+            vr_count += 1
+        if vl is None or vr is None:
+            continue
+        # cosine == dot product because your vectors are already L2-normalized
+        scores[i] = float(np.dot(vl, vr))
+        valid[i] = True
+
+    print(f"Missing left embeddings: {vl_count} / {N}")
+    print(f"Missing right embeddings: {vr_count} / {N}")
+
+    print(f"Embeddings loaded: {len(model._store)} terms")
+    print(f"Pairs: {len(left)}   Valid pairs: {int(valid.sum())}")
+
+    return scores, valid
 
 
 def pick_thresholds(labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
@@ -146,7 +208,7 @@ def main():
     parser.add_argument("--case-sensitive", action="store_true",
                         help="Treat NPZ keys as case-sensitive (default lowers them).")
     parser.add_argument("--non-strict", action="store_true",
-                        help="Use zero vector for missing words instead of raising.")
+                        help="Skip missing words (do not raise); compute scores only for pairs where both sides have embeddings.")
     parser.add_argument("--save-results", type=str, default=None,
                         help="Optional CSV/Parquet path to save per-pair results.")
     args = parser.parse_args()
@@ -161,18 +223,46 @@ def main():
         strict=not args.non_strict,
     )
 
-    scores = compute_scores(
+    scores, valid_mask = compute_scores(
         model=model,
         left=df[args.left_col].astype(str).tolist(),
         right=df[args.right_col].astype(str).tolist(),
         batch_size=args.batch_size,
     )
 
-    # Metrics
-    auc = roc_auc_score(labels, scores)
-    thrs = pick_thresholds(labels, scores)
-    m_youden = metrics_at_threshold(labels, scores, thrs["youden"])
-    m_acc = metrics_at_threshold(labels, scores, thrs["max_acc"])
+    # Metrics: compute only on valid pairs
+    if not valid_mask.any():
+        print("No pairs had embeddings on both sides. Nothing to evaluate.")
+        # still optionally save results (all similarities will be NaN)
+        if args.save_results:
+            out = df.copy()
+            out["similarity"] = scores
+            out.rename(columns={
+                args.left_col: "left",
+                args.right_col: "right",
+                args.label_col: "label"
+            }, inplace=True)
+            ext = os.path.splitext(args.save_results)[-1].lower()
+            if ext in (".parquet", ".pq"):
+                out.to_parquet(args.save_results, index=False)
+            else:
+                out.to_csv(args.save_results, index=False)
+        return
+
+    valid_labels = labels[valid_mask]
+    valid_scores = scores[valid_mask]
+
+    if np.unique(valid_labels).size < 2:
+        print("Valid pairs do not contain both label classes; cannot compute ROC AUC or thresholds.")
+        auc = float("nan")
+        thrs = {}
+        m_youden = {}
+        m_acc = {}
+    else:
+        auc = roc_auc_score(valid_labels, valid_scores)
+        thrs = pick_thresholds(valid_labels, valid_scores)
+        m_youden = metrics_at_threshold(valid_labels, valid_scores, thrs["youden"])
+        m_acc = metrics_at_threshold(valid_labels, valid_scores, thrs["max_acc"])    
 
     print("\n=== Summary Metrics ===")
     print(f"ROC_AUC: {auc:.6f}")
