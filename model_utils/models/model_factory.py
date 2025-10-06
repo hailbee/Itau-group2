@@ -1,78 +1,82 @@
-from .wrappers import (
-    CLIPModelWrapper,
-    CoCaModelWrapper,
-    FLAVAModelWrapper,
-    SigLIPModelWrapper,
-)
+# model_utils/models/model_factory.py
+from __future__ import annotations
+
+from typing import Any, Optional
+
+# Always available: our new precomputed backbone
+from .wrappers.precomputed_wrapper import PrecomputedModelWrapper
+
+# Optional imports for other backbones. If they are not present in your repo/env,
+# the corresponding create_model branch will raise with a helpful message.
+try:
+    from .wrappers.clip_wrapper import CLIPModelWrapper  # type: ignore
+except Exception:  # pragma: no cover
+    CLIPModelWrapper = None  # type: ignore
+
+try:
+    from .wrappers.siglip_wrapper import SigLIPModelWrapper  # type: ignore
+except Exception:  # pragma: no cover
+    SigLIPModelWrapper = None  # type: ignore
+
+try:
+    from .wrappers.flava_wrapper import FLAVAModelWrapper  # type: ignore
+except Exception:  # pragma: no cover
+    FLAVAModelWrapper = None  # type: ignore
+
+try:
+    from .wrappers.coca_wrapper import CoCaModelWrapper  # type: ignore
+except Exception:  # pragma: no cover
+    CoCaModelWrapper = None  # type: ignore
+
 
 class ModelFactory:
-    """Factory class for creating different model wrappers."""
-    
-    MODEL_CONFIGS = {
-        'clip': {
-            'class': CLIPModelWrapper,
-            'default_name': 'openai/clip-vit-base-patch32'
-        },
-        'coca': {
-            'class': CoCaModelWrapper,
-            'default_name': 'microsoft/git-base-coco'
-        },
-        'flava': {
-            'class': FLAVAModelWrapper,
-            'default_name': 'facebook/flava-full'
-        },
-        'siglip': {
-            'class': SigLIPModelWrapper,
-            'default_name': 'google/siglip-base-patch16-224'
-        }
-    }
-    
-    @classmethod
-    def create_model(cls, model_type, model_name=None, device=None):
+    """
+    Central place to construct a "backbone wrapper" given a name.
+    The returned object MUST expose:
+      - .embedding_dim : int
+      - .encode_text(List[str]) -> torch.FloatTensor [N, D]
+    """
+
+    @staticmethod
+    def create_model(name: str, device: Optional[str] = None, **kwargs: Any):
         """
-        Create a model wrapper of the specified type.
-        
-        Args:
-            model_type: One of 'clip', 'coca', 'flava', 'siglip'
-            model_name: Specific model name (optional, uses default if not provided)
-            device: Device to run on (auto-detected if None)
-            
-        Returns:
-            Model wrapper instance
+        name: backbone identifier (e.g., 'precomputed', 'clip', 'siglip', ...)
+        device: optional, only relevant for learnable/torch models
+        kwargs: backbone-specific arguments
         """
-        if model_type not in cls.MODEL_CONFIGS:
-            raise ValueError(f"Unsupported model type: {model_type}. "
-                           f"Supported types: {list(cls.MODEL_CONFIGS.keys())}")
-        
-        config = cls.MODEL_CONFIGS[model_type]
-        model_class = config['class']
-        default_name = config['default_name']
-        
-        # Use provided model_name or default
-        model_name = model_name or default_name
-        
-        try:
-            return model_class(model_name, device)
-        except ImportError as e:
-            # Provide helpful error message for missing dependencies
-            if model_type == 'siglip':
-                raise ImportError(
-                    f"Failed to create {model_type} model: {str(e)}\n"
-                    "Please install required dependencies: pip install sentencepiece==0.2.0"
-                )
-            else:
-                raise ImportError(f"Failed to create {model_type} model: {str(e)}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to create {model_type} model: {str(e)}")
-    
-    @classmethod
-    def get_available_models(cls):
-        """Get list of available model types."""
-        return list(cls.MODEL_CONFIGS.keys())
-    
-    @classmethod
-    def get_default_model_name(cls, model_type):
-        """Get the default model name for a given model type."""
-        if model_type not in cls.MODEL_CONFIGS:
-            raise ValueError(f"Unsupported model type: {model_type}")
-        return cls.MODEL_CONFIGS[model_type]['default_name'] 
+        if not name:
+            raise ValueError("create_model: 'name' must be provided")
+        key = name.lower().strip()
+
+        if key == "precomputed":
+            npz_paths = kwargs.get("npz_paths")
+            if not npz_paths:
+                raise ValueError("backbone='precomputed' requires npz_paths=[...]")
+            return PrecomputedModelWrapper(
+                npz_paths=npz_paths,
+                lowercase_keys=kwargs.get("lowercase_keys", True),
+                normalize=kwargs.get("normalize", False),
+                strict=kwargs.get("strict", True),
+            )
+
+        if key == "clip":
+            if CLIPModelWrapper is None:
+                raise ImportError("CLIPModelWrapper not available. Ensure wrappers/clip_wrapper.py and deps are installed.")
+            return CLIPModelWrapper(model_name=kwargs.get("model_name"), device=device)
+
+        if key == "siglip":
+            if SigLIPModelWrapper is None:
+                raise ImportError("SigLIPModelWrapper not available. Ensure wrappers/siglip_wrapper.py and deps are installed.")
+            return SigLIPModelWrapper(model_name=kwargs.get("model_name"), device=device)
+
+        if key == "flava":
+            if FLAVAModelWrapper is None:
+                raise ImportError("FLAVAModelWrapper not available. Ensure wrappers/flava_wrapper.py and deps are installed.")
+            return FLAVAModelWrapper(model_name=kwargs.get("model_name"), device=device)
+
+        if key == "coca":
+            if CoCaModelWrapper is None:
+                raise ImportError("CoCaModelWrapper not available. Ensure wrappers/coca_wrapper.py and deps are installed.")
+            return CoCaModelWrapper(model_name=kwargs.get("model_name"), device=device)
+
+        raise ValueError(f"Unknown backbone: {name!r}")

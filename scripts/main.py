@@ -1,446 +1,350 @@
+# scripts/main.py
+from __future__ import annotations
+
+# --- repo-root path bootstrap ---
+import sys, pathlib
+ROOT = pathlib.Path(__file__).resolve().parents[1]  # repo root (one level up from scripts/)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+# --- end bootstrap ---
+
 import argparse
-import ast
+import os
+from typing import Dict, List, Tuple
+
+import numpy as np
+import pandas as pd
 import torch
-from scripts.training.trainer import Trainer
-from scripts.evaluation.evaluator import Evaluator
-from scripts.grid_search.grid_searcher import GridSearcher
-from scripts.baseline.baseline_tester import BaselineTester
-from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
-from model_utils.models.learning.siamese import SiameseModelPairs, SiameseModelTriplet
-from model_utils.models.learning.supcon import SiameseModelSupCon
-from model_utils.models.learning.infonce import SiameseModelInfoNCE
+from sklearn.metrics import (
+    roc_auc_score,
+    roc_curve,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    confusion_matrix,
+)
+
+from model_utils.models.model_factory import ModelFactory
+from model_utils.models.base import BaseSiameseModel
+
+
+# ------------------------------
+# Data loading / metrics helpers
+# ------------------------------
+
+def load_pairs_dataframe(path: str, left_col: str, right_col: str, label_col: str) -> pd.DataFrame:
+    ext = os.path.splitext(path)[-1].lower()
+    if ext in (".parquet", ".pq"):
+        df = pd.read_parquet(path)
+    elif ext in (".csv", ".tsv"):
+        sep = "\t" if ext == ".tsv" else ","
+        df = pd.read_csv(path, sep=sep)
+    else:
+        raise ValueError(f"Unsupported pairs file type: {ext}. Use .csv, .tsv, or .parquet")
+
+    missing = [c for c in (left_col, right_col, label_col) if c not in df.columns]
+    if missing:
+        raise ValueError(f"Pairs file missing required columns: {missing}. Found: {list(df.columns)}")
+
+    return df[[left_col, right_col, label_col]].copy()
+
+
+@torch.inference_mode()
+def compute_pairwise_scores(
+    model: BaseSiameseModel,
+    left: List[str],
+    right: List[str],
+    batch_size: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Returns:
+      scores: [N] float32 (NaN where invalid/missing)
+      valid:  [N] bool mask
+    """
+    assert len(left) == len(right)
+    N = len(left)
+    scores = np.full(N, np.nan, dtype=np.float32)
+    valid = np.zeros(N, dtype=bool)
+
+    for i in range(0, N, batch_size):
+        j = min(i + batch_size, N)
+        L = left[i:j]
+        R = right[i:j]
+
+        # We call model.encode() twice with aligned inputs
+        ZL = model.encode(L)  # [B, D]
+        ZR = model.encode(R)  # [B, D]
+
+        # If using the precomputed backbone in non-strict mode, missing words are zero vectors.
+        # Detect valid rows via norm>0 on both sides (pre-normalized -> norm==0 only for zeros).
+        L_norm2 = (ZL ** 2).sum(dim=1).cpu().numpy()
+        R_norm2 = (ZR ** 2).sum(dim=1).cpu().numpy()
+        ok = (L_norm2 > 1e-12) & (R_norm2 > 1e-12)
+
+        if np.any(ok):
+            sims = (ZL[ok] * ZR[ok]).sum(dim=1).cpu().numpy()  # cosine == dot product after normalization
+            idxs = np.where(ok)[0]
+            for u, s in zip(idxs, sims):
+                scores[i + int(u)] = float(s)
+                valid[i + int(u)] = True
+
+    return scores, valid
+
+
+def pick_thresholds(labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
+    fpr, tpr, thr = roc_curve(labels, scores)
+    youden_idx = int(np.argmax(tpr - fpr))
+    thr_youden = float(thr[youden_idx])
+
+    # Max-accuracy across same threshold grid
+    preds_grid = (scores[:, None] >= thr[None, :])
+    accs = (preds_grid == labels[:, None]).mean(axis=0)
+    thr_maxacc = float(thr[int(np.argmax(accs))])
+
+    return {"youden": thr_youden, "max_acc": thr_maxacc}
+
+
+def metrics_at_threshold(labels: np.ndarray, scores: np.ndarray, thr: float) -> Dict[str, float]:
+    preds = (scores >= thr).astype(int)
+    acc = accuracy_score(labels, preds)
+    prec = precision_score(labels, preds, zero_division=0)
+    rec = recall_score(labels, preds, zero_division=0)
+    tn, fp, fn, tp = confusion_matrix(labels, preds).ravel()
+    return {
+        "threshold": float(thr),
+        "accuracy": float(acc),
+        "precision": float(prec),
+        "recall": float(rec),
+        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+    }
+
+
+# -----------
+# Main driver
+# -----------
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="Unified entry point for baseline and evaluate_saved.")
+
+    # Modes
+    p.add_argument("--mode", type=str, required=True, choices=["baseline", "evaluate_saved"],
+                   help="baseline: zero/one-shot eval without training; evaluate_saved: load a trained checkpoint and evaluate.")
+
+    # Pairs / columns
+    p.add_argument("--pairs", type=str, required=True, help="CSV/TSV/Parquet with left/right/label columns.")
+    p.add_argument("--left-col", type=str, default="fraudulent_name", help="Column name for left/query word.")
+    p.add_argument("--right-col", type=str, default="real_name", help="Column name for right/reference word.")
+    p.add_argument("--label-col", type=str, default="label", help="Column name for binary label (0/1).")
+
+    # Backbone selection
+    p.add_argument("--backbone", type=str, default="clip",
+                   help="Backbone name: clip, siglip, flava, coca, or precomputed (glyph-embedding NPZ).")
+    p.add_argument("--model-name", type=str, default=None, help="Optional HF/openai model name for certain backbones.")
+    p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="cuda or cpu.")
+
+    # Precomputed-specific
+    p.add_argument("--npz", nargs="+", default=None,
+                   help="(precomputed) One or more NPZ files mapping word -> 1D vector.")
+    p.add_argument("--pc-norm", action="store_true",
+                   help="(precomputed) L2-normalize vectors on load/encode (use only if NPZ not already normalized).")
+    p.add_argument("--pc-case-sensitive", action="store_true",
+                   help="(precomputed) Treat NPZ keys as case-sensitive (default lowercases).")
+    p.add_argument("--pc-non-strict", action="store_true",
+                   help="(precomputed) Missing words map to zeros instead of error.")
+
+    # Projector / batching
+    p.add_argument("--projection-dim", type=int, default=128,
+                   help="Projection size if a projector is used (ignored for precomputed).")
+    p.add_argument("--batch-size", type=int, default=2048, help="Batch size for encoding/scoring.")
+
+    # Evaluate_saved (checkpointed models)
+    p.add_argument("--checkpoint", type=str, default=None, help="Path to a saved model checkpoint (evaluate_saved).")
+
+    # Outputs
+    p.add_argument("--save-results", type=str, default=None, help="Optional CSV/Parquet to save per-pair scores.")
+    return p
+
+
+def run_baseline(args: argparse.Namespace) -> None:
+    # Build wrapper
+    if args.backbone.lower() == "precomputed":
+        if not args.npz:
+            raise SystemExit("When --backbone precomputed, you must pass --npz <files...>")
+        wrapper = ModelFactory.create_model(
+            "precomputed",
+            npz_paths=args.npz,
+            lowercase_keys=not args.pc_case_sensitive,
+            normalize=args.pc_norm,
+            strict=not args.pc_non_strict,
+        )
+        # Skip projector entirely for precomputed vectors
+        model = BaseSiameseModel(backbone=wrapper, projection_dim=wrapper.embedding_dim, use_projector=False)
+    else:
+        # Standard backbone path (requires corresponding wrappers present)
+        wrapper = ModelFactory.create_model(args.backbone, device=args.device, model_name=args.model_name)
+        model = BaseSiameseModel(backbone=wrapper, projection_dim=args.projection_dim, use_projector=True)
+        model = model.to(args.device)  # in case wrapper returns device tensors
+
+    # Load pairs
+    df = load_pairs_dataframe(args.pairs, args.left_col, args.right_col, args.label_col)
+    labels = df[args.label_col].astype(int).to_numpy()
+
+    # Compute pairwise similarities
+    scores, valid = compute_pairwise_scores(
+        model=model,
+        left=df[args.left_col].astype(str).tolist(),
+        right=df[args.right_col].astype(str).tolist(),
+        batch_size=args.batch_size,
+    )
+
+    total, good = len(df), int(valid.sum())
+    print(f"[baseline] pairs={total}  valid={good}")
+
+    if good == 0:
+        print("No valid pairs had embeddings on both sides; nothing to evaluate.")
+        _maybe_save_results(args, df, scores)
+        return
+
+    v_labels = labels[valid]
+    v_scores = scores[valid]
+
+    if np.unique(v_labels).size < 2:
+        print("Valid pairs do not contain both label classes; cannot compute ROC AUC or thresholds.")
+        _maybe_save_results(args, df, scores)
+        return
+
+    auc = roc_auc_score(v_labels, v_scores)
+    thrs = pick_thresholds(v_labels, v_scores)
+    m_y = metrics_at_threshold(v_labels, v_scores, thrs["youden"])
+    m_a = metrics_at_threshold(v_labels, v_scores, thrs["max_acc"])
+
+    print("\n=== Summary Metrics (baseline) ===")
+    print(f"ROC_AUC: {auc:.6f}")
+    print("\n-- Best-Youden --")
+    for k, v in m_y.items():
+        print(f"{k}: {v}")
+    print("\n-- Best-Accuracy --")
+    for k, v in m_a.items():
+        print(f"{k}: {v}")
+
+    _maybe_save_results(args, df, scores)
+
+
+def run_evaluate_saved(args: argparse.Namespace) -> None:
+    """
+    Generic checkpoint loader. This assumes your checkpoint contains:
+      - 'state_dict': model weights for BaseSiameseModel
+      - 'backbone_name', 'projection_dim', and (optionally) 'model_name'
+    Adjust as needed for your actual checkpoint format.
+    """
+    if not args.checkpoint:
+        raise SystemExit("--mode evaluate_saved requires --checkpoint")
+
+    ckpt = torch.load(args.checkpoint, map_location="cpu")
+    backbone_name = ckpt.get("backbone_name", None)
+    projection_dim = ckpt.get("projection_dim", 128)
+    model_name = ckpt.get("model_name", None)
+
+    if backbone_name is None:
+        raise RuntimeError("Checkpoint missing 'backbone_name'. Please include it when saving checkpoints.")
+
+    if backbone_name.lower() == "precomputed":
+        # Precomputed + checkpoint doesn't make sense; skip projector and don't load state_dict.
+        if not args.npz:
+            raise SystemExit("evaluate_saved with backbone=precomputed requires --npz to supply vectors.")
+        wrapper = ModelFactory.create_model(
+            "precomputed",
+            npz_paths=args.npz,
+            lowercase_keys=not args.pc_case_sensitive,
+            normalize=args.pc_norm,
+            strict=not args.pc_non_strict,
+        )
+        model = BaseSiameseModel(backbone=wrapper, projection_dim=wrapper.embedding_dim, use_projector=False)
+    else:
+        wrapper = ModelFactory.create_model(backbone_name, device=args.device, model_name=model_name)
+        model = BaseSiameseModel(backbone=wrapper, projection_dim=int(projection_dim), use_projector=True)
+        sd = ckpt.get("state_dict", None)
+        if sd is None:
+            raise RuntimeError("Checkpoint missing 'state_dict'.")
+        missing, unexpected = model.load_state_dict(sd, strict=False)
+        if missing or unexpected:
+            print(f"[warn] load_state_dict: missing={missing}, unexpected={unexpected}")
+        model = model.to(args.device)
+
+    # Evaluate exactly like baseline
+    df = load_pairs_dataframe(args.pairs, args.left_col, args.right_col, args.label_col)
+    labels = df[args.label_col].astype(int).to_numpy()
+
+    scores, valid = compute_pairwise_scores(
+        model=model,
+        left=df[args.left_col].astype(str).tolist(),
+        right=df[args.right_col].astype(str).tolist(),
+        batch_size=args.batch_size,
+    )
+
+    total, good = len(df), int(valid.sum())
+    print(f"[evaluate_saved] pairs={total}  valid={good}")
+
+    if good == 0:
+        print("No valid pairs had embeddings on both sides; nothing to evaluate.")
+        _maybe_save_results(args, df, scores)
+        return
+
+    v_labels = labels[valid]
+    v_scores = scores[valid]
+
+    if np.unique(v_labels).size < 2:
+        print("Valid pairs do not contain both label classes; cannot compute ROC AUC or thresholds.")
+        _maybe_save_results(args, df, scores)
+        return
+
+    auc = roc_auc_score(v_labels, v_scores)
+    thrs = pick_thresholds(v_labels, v_scores)
+    m_y = metrics_at_threshold(v_labels, v_scores, thrs["youden"])
+    m_a = metrics_at_threshold(v_labels, v_scores, thrs["max_acc"])
+
+    print("\n=== Summary Metrics (evaluate_saved) ===")
+    print(f"ROC_AUC: {auc:.6f}")
+    print("\n-- Best-Youden --")
+    for k, v in m_y.items():
+        print(f"{k}: {v}")
+    print("\n-- Best-Accuracy --")
+    for k, v in m_a.items():
+        print(f"{k}: {v}")
+
+    _maybe_save_results(args, df, scores)
+
+
+def _maybe_save_results(args: argparse.Namespace, df: pd.DataFrame, scores: np.ndarray) -> None:
+    if not args.save_results:
+        return
+    out = df.copy()
+    out["similarity"] = scores
+    out.rename(columns={
+        args.left_col: "left",
+        args.right_col: "right",
+        args.label_col: "label"
+    }, inplace=True)
+    ext = os.path.splitext(args.save_results)[-1].lower()
+    os.makedirs(os.path.dirname(args.save_results), exist_ok=True) if os.path.dirname(args.save_results) else None
+    if ext in (".parquet", ".pq"):
+        out.to_parquet(args.save_results, index=False)
+    else:
+        out.to_csv(args.save_results, index=False)
+    print(f"[info] Saved per-pair results to {args.save_results}")
+
 
 def main():
-    parser = argparse.ArgumentParser(description='CLIP-based text similarity training and evaluation')
-    parser.add_argument('--mode', type=str, 
-                      choices=['train', 'grid_search', 'bayesian', 'random', 'optuna', 'compare', 'baseline', 'evaluate_saved', 'ensemble'], 
-                      required=True,
-                      help='Mode to run: train, grid_search, bayesian, random, optuna, compare, baseline, evaluate_saved, or ensemble (combines pre-trained model with fuzzy string matching)')
-    parser.add_argument('--training_filepath', type=str,
-                      help='Path to training data (for training modes)')
-    parser.add_argument('--test_filepath', type=str, required=True,
-                      help='Path to test data (CSV or Parquet with fraudulent_name, real_name, label)')
-    parser.add_argument('--model_type', type=str, choices=['pair', 'triplet', 'supcon', 'infonce'], default='pair',
-                      help='Model type: pair, triplet, supcon, or infonce')
-    parser.add_argument('--loss_type', type=str, choices=['cosine', 'euclidean', 'hybrid', 'supcon', 'infonce'], default='cosine',
-                      help='Loss function type')
-    parser.add_argument('--baseline_model', type=str, choices=['clip', 'coca', 'flava', 'siglip', 'openclip', 'all'], default='clip',
-                      help='Baseline model to test (for baseline mode)')
-    parser.add_argument('--backbone', type=str, choices=['clip', 'coca', 'flava', 'siglip'], default='clip',
-                      help='Vision-language backbone to use (clip, siglip, flava, etc.)')
-    parser.add_argument('--batch_size', type=int, default=32,
-                      help='Batch size for processing')
-    parser.add_argument('--medium_filepath', type=str,
-                      help='Path to medium data (optional)')
-    parser.add_argument('--easy_filepath', type=str,
-                      help='easy to medium data (optional)')
-    parser.add_argument('--external', action='store_true', default=False,
-                      help='If set, evaluate on an external pairwise dataset (no reference set, only test_filepath required)')
-    parser.add_argument('--validate_filepath', type=str, default=None, help='Path to validation data file (CSV or Parquet). Used for mid-training and end-of-training validation.')
-    parser.add_argument('--plot', action='store_true', help='If set, plot ROC and confusion matrices during evaluation')
-    
-    # Grid search parameters
-    parser.add_argument('--lrs', type=str, default='[1e-4]',
-                      help='Learning rates to try (for grid search)')
-    parser.add_argument('--batch_sizes', type=str, default='[32]',
-                      help='Batch sizes to try (for grid search)')
-    parser.add_argument('--margins', type=str, default='[0.5]',
-                      help='Margins to try (for grid search)')
-    parser.add_argument('--internal_layer_sizes', type=str, default='[128]',
-                      help='Internal layer sizes to try (for grid search)')
-    
-    # Training parameters
-    parser.add_argument('--epochs', type=int, default=5,
-                      help='Number of training epochs')
-    parser.add_argument('--curriculum', type=str, default=None,
-                      help='Curriculum learning mode')
-    parser.add_argument('--log_dir', type=str, default='/content/drive/MyDrive/Project_2_Business_Names/Summer 2025/code',
-                      help='Directory to save results')
-    parser.add_argument('--temperature', type=float, default=0.07,
-                      help='Temperature parameter for SupCon/InfoNCE loss (default: 0.07)')
-    
-    # Hyperparameter optimization parameters
-    parser.add_argument('--n_trials', type=int, default=50,
-                      help='Number of trials for optimization methods')
-    parser.add_argument('--n_calls', type=int, default=50,
-                      help='Number of calls for Bayesian optimization')
-    parser.add_argument('--n_random_starts', type=int, default=10,
-                      help='Number of random starts for Bayesian optimization')
-    parser.add_argument('--sampler', type=str, choices=['tpe', 'random', 'cmaes'], default='tpe',
-                      help='Sampler for Optuna optimization')
-    parser.add_argument('--pruner', type=str, choices=['median', 'hyperband', 'none'], default='median',
-                      help='Pruner for Optuna optimization')
-    parser.add_argument('--study_name', type=str,
-                      help='Study name for Optuna optimization')
-    
-    # Ensemble mode parameters
-    parser.add_argument('--model_path', type=str, default=None,
-                      help='Path to the saved .pt model file (default: log_dir/best_model_siglip_pair.pt)')
-    parser.add_argument('--ensemble_output_dir', type=str, default='ensemble_results',
-                      help='Directory to save ensemble results (default: ensemble_results)')
-
+    parser = build_arg_parser()
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.mode == "baseline":
+        run_baseline(args)
+    elif args.mode == "evaluate_saved":
+        run_evaluate_saved(args)
+    else:
+        raise SystemExit(f"Unsupported mode: {args.mode}")
 
-    def get_siamese_model(mode, backbone_name, embedding_dim=512, projection_dim=128, device=None):
-        from scripts.baseline.baseline_tester import BaselineTester
-        tester = BaselineTester(model_type=backbone_name, batch_size=1, device=device)
-        backbone_module = tester.model_wrapper  # Use the wrapper, not .model
-        assert hasattr(backbone_module, 'encode_text'), f"Backbone {type(backbone_module)} does not have encode_text"
-        if mode == 'pair':
-            return SiameseModelPairs(embedding_dim, projection_dim, backbone=backbone_module)
-        elif mode == 'triplet':
-            return SiameseModelTriplet(embedding_dim, projection_dim, backbone=backbone_module)
-        elif mode == 'supcon':
-            return SiameseModelSupCon(embedding_dim, projection_dim, backbone=backbone_module)
-        elif mode == 'infonce':
-            return SiameseModelInfoNCE(embedding_dim, projection_dim, backbone=backbone_module)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
 
-    if args.mode == 'baseline':
-        from scripts.baseline.baseline_tester import BaselineTester
-        # Test baseline model(s) performance (pairwise only)
-        if args.baseline_model == 'all':
-            print("Testing all available baseline models...")
-            tester = BaselineTester(model_type='clip', batch_size=args.batch_size, device=device)
-            all_results = tester.test_all_models(args.test_filepath)
-            print("\nBaseline Results Summary:")
-            for model_type, result in all_results.items():
-                if 'error' in result:
-                    print(f"{model_type.upper()}: ERROR - {result['error']}")
-                else:
-                    metrics = result['metrics']
-                    # Print only relevant metrics
-                    metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
-                    print(f"{model_type.upper()}: {metrics_to_print}")
-        else:
-            print(f"Testing {args.baseline_model.upper()} baseline model...")
-            tester = BaselineTester(model_type=args.baseline_model, batch_size=args.batch_size, device=device)
-            results_df, metrics = tester.test(args.test_filepath)
-            print(f"\n{args.baseline_model.upper()} Baseline Results:")
-            metrics_to_print = {k: v for k, v in metrics.items() if k != 'roc_curve'}
-            print(metrics_to_print)
-    
-    elif args.mode == 'evaluate_saved':
-        print("Loading saved model for evaluation...")
-        # Load backbone
-        from scripts.baseline.baseline_tester import BaselineTester
-        tester = BaselineTester(model_type=args.backbone, batch_size=1, device=device)
-        backbone_module = tester.model_wrapper  # must have .encode_text
-        
-        # Load your model with matching dimensions
-        model = SiameseModelPairs(embedding_dim=768, projection_dim=768, backbone=backbone_module).to(device)
-
-        # Load saved weights
-        state_dict = torch.load(args.log_dir + "/best_model_siglip_pair.pt", map_location=device)
-        model.load_state_dict(state_dict)
-        model.eval()
-
-        # Evaluate
-        evaluator = Evaluator(model, batch_size=args.batch_size, model_type=args.model_type)
-        results_df, metrics = evaluator.evaluate(args.test_filepath, plot=args.plot)
-
-        print("\n Evaluation complete. Results:")
-        for k, v in metrics.items():
-            if k != 'roc_curve':
-                print(f"{k}: {v}")
-        
-        # Save results_df to computer
-        import pandas as pd
-        from datetime import datetime
-        import os
-        
-        # Create output directory if it doesn't exist
-        output_dir = "evaluation_results"
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"evaluation_results_{timestamp}.csv"
-        filepath = os.path.join(output_dir, filename)
-        
-        # Save results_df to CSV
-        results_df.to_csv(filepath, index=False)
-        print(f"\nResults saved to: {filepath}")
-        
-        # Also save metrics to a separate file
-        metrics_filename = f"evaluation_metrics_{timestamp}.json"
-        metrics_filepath = os.path.join(output_dir, metrics_filename)
-        
-        import json
-        # Convert numpy types to Python types for JSON serialization
-        def convert_np(obj):
-            if isinstance(obj, dict):
-                return {k: convert_np(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_np(v) for v in obj]
-            elif hasattr(obj, 'item') and callable(obj.item):
-                return obj.item()
-            else:
-                return obj
-        
-        metrics_serializable = convert_np(metrics)
-        with open(metrics_filepath, 'w') as f:
-            json.dump(metrics_serializable, f, indent=2)
-        print(f"Metrics saved to: {metrics_filepath}")
-
-    elif args.mode == 'train':
-        # Single training run
-        model = get_siamese_model(args.model_type, args.backbone, embedding_dim=512, projection_dim=128, device=device).to(device)
-        
-        # Get appropriate loss class
-        if args.model_type == 'pair':
-            if args.loss_type == 'cosine':
-                from model_utils.loss.pair_losses import CosineLoss
-                criterion = CosineLoss(margin=0.5)
-            else:
-                from model_utils.loss.pair_losses import EuclideanLoss
-                criterion = EuclideanLoss(margin=1.0)
-        elif args.model_type == 'triplet':
-            if args.loss_type == 'cosine':
-                from model_utils.loss.triplet_losses import CosineTripletLoss
-                criterion = CosineTripletLoss(margin=0.1)
-            elif args.loss_type == 'euclidean':
-                from model_utils.loss.triplet_losses import EuclideanTripletLoss
-                criterion = EuclideanTripletLoss(margin=1.0)
-            elif args.loss_type == 'hybrid':
-                from model_utils.loss.triplet_losses import HybridTripletLoss
-                criterion = HybridTripletLoss(margin=1.0, alpha=0.5)
-        elif args.model_type == 'supcon':
-            if args.loss_type == 'supcon':
-                from model_utils.loss.supcon_loss import SupConLoss
-                criterion = SupConLoss(temperature=args.temperature)
-            elif args.loss_type == 'infonce':
-                from model_utils.loss.infonce_loss import InfoNCELoss
-                criterion = InfoNCELoss(temperature=args.temperature)
-        else:  # infonce
-            from model_utils.loss.infonce_loss import InfoNCELoss
-            criterion = InfoNCELoss(temperature=args.temperature)
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-        
-        # Create dataloaders
-        import pandas as pd
-        from torch.utils.data import DataLoader
-        
-        # Load training data
-        dataframe = pd.read_parquet(args.training_filepath)
-        
-        # Create appropriate dataset and dataloader based on model type
-        if args.model_type == "pair":
-            from utils.data import TextPairDataset
-            dataset = TextPairDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        elif args.model_type == "triplet":
-            from utils.data import TripletDataset
-            dataset = TripletDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        elif args.model_type == "supcon":
-            from utils.data import SupConDataset
-            dataset = SupConDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-        elif args.model_type == "infonce":
-            from utils.data import InfoNCEDataset, infonce_collate_fn
-            dataset = InfoNCEDataset(dataframe)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
-        else:
-            raise ValueError(f"Unknown model type: {args.model_type}")
-        
-        # Create warmup dataloader if warmup filepath is provided
-        easy_loader = None
-        medium_loader = None
-        if args.easy_filepath and args.medium_filepath:
-            medium_dataframe = pd.read_parquet(args.medium_filepath)
-            easy_dataframe = pd.read_parquet(args.easy_filepath)
-            
-            if args.model_type == "pair":
-                from utils.data import TextPairDataset
-                medium_dataset = TextPairDataset(medium_dataframe)
-                easy_dataset = TextPairDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-            elif args.model_type == "triplet":
-                from utils.data import TripletDataset
-                medium_dataset = TripletDataset(medium_dataframe)
-                easy_dataset = TripletDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
-            elif args.model_type == "supcon":
-                from utils.data import SupConDataset, supcon_collate_fn
-                medium_dataset = SupConDataset(medium_dataframe)
-                easy_dataset = SupConDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=supcon_collate_fn)
-            elif args.model_type == "infonce":
-                from utils.data import InfoNCEDataset, infonce_collate_fn
-                medium_dataset = InfoNCEDataset(medium_dataframe)
-                easy_dataset = InfoNCEDataset(easy_dataframe)
-                medium_loader = DataLoader(medium_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
-                easy_loader = DataLoader(easy_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, collate_fn=infonce_collate_fn)
-            else:
-                raise ValueError(f"Unknown model type: {args.model_type}")
-
-        ### here: pass in the model_type
-        trainer = Trainer(model, criterion, optimizer, device, model_type=args.model_type)
-        trainer.train(
-            dataloader=dataloader,
-            test_filepath=args.test_filepath,
-            mode=args.model_type,
-            epochs=args.epochs,
-            medium_loader=medium_loader,
-            easy_loader=easy_loader,
-            curriculum=args.curriculum,
-            validate_filepath=args.validate_filepath,
-            plot=args.plot
-        )
-
-    elif args.mode == 'grid_search':
-        # Grid search
-        from scripts.baseline.baseline_tester import BaselineTester
-        tester = BaselineTester(model_type=args.backbone, batch_size=1, device=device)
-        backbone_module = tester.model_wrapper
-        def model_class_factory(embedding_dim, projection_dim):
-            # Debug print statements
-            if isinstance(embedding_dim, (tuple, list)):
-                embedding_dim = embedding_dim[0]
-            if isinstance(projection_dim, (tuple, list)):
-                projection_dim = projection_dim[0]
-            # Always cast to int
-            embedding_dim = int(embedding_dim)
-            projection_dim = int(projection_dim)
-            return get_siamese_model(args.model_type, args.backbone, embedding_dim=embedding_dim, projection_dim=projection_dim, device=device)
-        searcher = GridSearcher(model_class_factory, device, log_dir=args.log_dir, backbone=backbone_module)
-        
-        lrs = ast.literal_eval(args.lrs)
-        batch_sizes = ast.literal_eval(args.batch_sizes)
-        margins = ast.literal_eval(args.margins)
-        internal_layer_sizes = ast.literal_eval(args.internal_layer_sizes)
-        
-        best_config, results_df = searcher.search(
-            training_filepath=args.training_filepath,
-            test_filepath=args.test_filepath,
-            lrs=lrs,
-            batch_sizes=batch_sizes,
-            margins=margins,
-            internal_layer_sizes=internal_layer_sizes,
-            mode=args.model_type,
-            loss_type=args.loss_type,
-            medium_filepath=args.medium_filepath,
-            easy_filepath=args.easy_filepath,
-            epochs=args.epochs,
-            temperature=args.temperature,
-            curriculum=args.curriculum,
-            validate_filepath=args.validate_filepath
-        )
-        
-        print("\nGrid Search Results:")
-        print(f"Best configuration: {best_config}")
-        print("\nAll results saved to:", args.log_dir)
-
-    elif args.mode in ['bayesian', 'random', 'optuna']:
-        # Advanced hyperparameter optimization
-        optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=device, log_dir=args.log_dir)
-        
-        # Prepare optimization parameters
-        opt_params = {
-            'n_trials': args.n_trials,
-            'n_calls': args.n_calls,
-            'n_random_starts': args.n_random_starts,
-            'sampler': args.sampler,
-            'pruner': args.pruner if args.pruner != 'none' else None,
-            'study_name': args.study_name,
-            'epochs': args.epochs,
-        }
-        
-        results = optimizer.optimize(
-            method=args.mode,
-            training_filepath=args.training_filepath,
-            test_filepath=args.test_filepath,
-            mode=args.model_type,
-            loss_type=args.loss_type,
-            medium_filepath=args.medium_filepath,
-            easy_filepath=args.easy_filepath,
-            curriculum=args.curriculum,
-            **opt_params,
-            validate_filepath=args.validate_filepath
-        )
-
-    elif args.mode == 'compare':
-        # Compare different optimization methods
-        optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=device, log_dir=args.log_dir)
-        
-        # Prepare optimization parameters
-        opt_params = {
-            'n_trials': args.n_trials,
-            'n_calls': args.n_calls,
-            'n_random_starts': args.n_random_starts,
-            'epochs': args.epochs,
-            'sampler': args.sampler,
-            'pruner': args.pruner if args.pruner != 'none' else None
-        }
-        
-        results = optimizer.compare_methods(
-            training_filepath=args.training_filepath,
-            test_filepath=args.test_filepath,
-            mode=args.model_type,
-            loss_type=args.loss_type,
-            medium_filepath=args.medium_filepath,
-            easy_filepath=args.easy_filepath,
-            curriculum=args.curriculum,
-            **opt_params,
-            validate_filepath=args.validate_filepath
-        )
-        
-        print(f"\nComparison results saved to: {args.log_dir}")
-
-    elif args.mode == 'ensemble':
-        # Ensemble mode - combine pre-trained model with fuzzy string matching features
-        print("Running ensemble mode...")
-        
-        # Validate required arguments for ensemble mode
-        if not args.training_filepath:
-            print("Error: --training_filepath is required for ensemble mode")
-            return
-        
-        if not args.test_filepath:
-            print("Error: --test_filepath is required for ensemble mode")
-            return
-        
-        # Use same default model path as evaluate_saved mode
-        if not args.model_path:
-            args.model_path = args.log_dir + "/best_model_siglip_pair.pt"
-            print(f"Using default model path: {args.model_path}")
-        
-        # Import ensemble pipeline
-        from scripts.ensemble_pipeline import EnsemblePipeline
-        
-        # Run ensemble pipeline
-        try:
-            pipeline = EnsemblePipeline(
-                model_path=args.model_path,
-                backbone=args.backbone,
-                batch_size=args.batch_size
-            )
-            
-            # Run the pipeline
-            results = pipeline.run_pipeline(
-                training_filepath=args.training_filepath,
-                test_filepath=args.test_filepath,
-                output_dir=args.ensemble_output_dir
-            )
-            
-            print(f"\nEnsemble pipeline completed successfully!")
-            print(f"Results saved to: {args.ensemble_output_dir}")
-            print(f"Accuracy: {results['accuracy']:.4f}")
-            print(f"AUC: {results['auc']:.4f}")
-            
-        except Exception as e:
-            print(f"Error running ensemble pipeline: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return
-
-if __name__ == '__main__':
-    main() 
+if __name__ == "__main__":
+    main()

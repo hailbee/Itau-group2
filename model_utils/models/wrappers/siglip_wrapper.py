@@ -20,17 +20,19 @@ class SigLIPModelWrapper:
         self._load_model()
     
     def _load_model(self):
+        DEFAULT_SIGLIP = "google/siglip-base-patch16-224"
         if not SENTENCEPIECE_AVAILABLE:
             raise ImportError(
                 "SigLIP models require the 'sentencepiece' library. "
                 "Please install it with: pip install sentencepiece==0.2.0"
             )
         self.model = SiglipTextModel.from_pretrained(
-            self.model_name, 
+            self.model_name or DEFAULT_SIGLIP, 
             torch_dtype=torch.float32
         ).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name
+            self.model_name or DEFAULT_SIGLIP,
+            use_fast=True
         )
     
     def encode_text(self, texts):

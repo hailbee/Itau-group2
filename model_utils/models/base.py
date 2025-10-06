@@ -1,40 +1,53 @@
+# model_utils/models/base.py
+from __future__ import annotations
+
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class BaseSiameseModel(nn.Module):
     """
-    Base class for siamese models that can work with any vision-language model.
+    Thin model that wraps a backbone text-encoder wrapper and (optionally) a projector head.
+    Requirements on `backbone`:
+      - .embedding_dim : int
+      - .encode_text(List[str]) -> torch.FloatTensor [N, D]
     """
-    def __init__(self, embedding_dim=512, projection_dim=128, backbone=None):
-        super().__init__()
-        self.backbone = backbone  # Model wrapper (CLIP, FLAVA, etc.)
-        
-        # Projector without dropout layers
-        self.projector = nn.Sequential(
-            nn.Linear(embedding_dim, projection_dim),
-            nn.ReLU(),
-            nn.Linear(projection_dim, projection_dim)
-        )
 
-    def encode(self, texts):
+    def __init__(self, backbone, projection_dim: int = 128, use_projector: bool = True):
+        super().__init__()
+        self.backbone = backbone
+        self.use_projector = use_projector
+
+        in_dim = getattr(backbone, "embedding_dim", None)
+        if in_dim is None:
+            raise ValueError("Backbone must expose .embedding_dim")
+
+        if use_projector:
+            # Lightweight 2-layer MLP projector
+            self.projector = nn.Sequential(
+                nn.Linear(in_dim, projection_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(projection_dim, projection_dim),
+            )
+            self.out_dim = projection_dim
+        else:
+            # Identity: output stays in backbone's embedding space
+            self.projector = nn.Identity()
+            self.out_dim = in_dim
+
+    @torch.inference_mode()
+    def encode(self, texts: List[str]) -> torch.FloatTensor:
         """
-        Encode texts using the backbone model and project to embedding space.
-        
-        Args:
-            texts: List of text strings to encode
-            
-        Returns:
-            Normalized embeddings
+        Returns L2-normalized embeddings. If backbone returns already-normalized
+        vectors (e.g., precomputed), the extra normalization is harmless.
         """
-        features = self.backbone.encode_text(texts)
-        z = self.projector(features)
-        
-        return F.normalize(z, dim=1)
-    
-    def to(self, device):
-        """Move model to specified device."""
-        super().to(device)
-        if self.backbone:
-            self.backbone.to(device)
-        return self 
+        # Backbone handles any device specifics internally (or returns CPU tensors)
+        z = self.backbone.encode_text(texts)  # [N, D]
+        if not isinstance(z, torch.Tensor):
+            z = torch.tensor(z, dtype=torch.float32)
+        z = self.projector(z)                 # [N, P] or Identity
+        z = F.normalize(z, dim=1)
+        return z
