@@ -87,7 +87,6 @@ def compute_pairwise_scores(
             for u, s in zip(idxs, sims):
                 scores[i + int(u)] = float(s)
                 valid[i + int(u)] = True
-
     return scores, valid
 
 
