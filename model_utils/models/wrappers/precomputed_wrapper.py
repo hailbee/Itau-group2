@@ -1,6 +1,8 @@
 from typing import Dict, List, Sequence, Optional
 import numpy as np
 import torch
+from tqdm import tqdm
+import os
 
 class PrecomputedModelWrapper:
     """
@@ -20,8 +22,9 @@ class PrecomputedModelWrapper:
         self._store: Dict[str, np.ndarray] = {}
 
         for p in npz_paths:
+            p = os.path.abspath(p)
             data = np.load(p, allow_pickle=True)
-            for k in data.files:
+            for k in tqdm(data.files):
                 key = k.split(".")[0]
                 key = key.lower() if lowercase_keys else key
                 v = data[k].astype(np.float32)
