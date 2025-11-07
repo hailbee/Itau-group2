@@ -28,6 +28,11 @@ from sklearn.metrics import (
 from model_utils.models.model_factory import ModelFactory
 from model_utils.models.base import BaseSiameseModel
 
+import matplotlib
+matplotlib.use("Agg")  # headless
+import matplotlib.pyplot as plt
+
+
 
 # ------------------------------
 # Data loading / metrics helpers
@@ -263,6 +268,9 @@ def run_pairwise_mlp(args: argparse.Namespace) -> None:
     print(f"Accuracy: {acc:.4f}")
     print(f"TN={tn}  FP={fp}  FN={fn}  TP={tp}")
 
+    if args.roc_path:
+        save_roc_plot(Yev, probs, args.roc_path, title="ROC (pairwise-mlp)")
+
     # optional: save per-pair results aligned to eval split
     if args.save_results:
         out = dfv.iloc[ev_idx].copy()
@@ -337,7 +345,32 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--load-head", type=str, default=None, help="Optional path to load a pre-trained MLP head (.pt).")
     p.add_argument("--save-features", type=str, default=None, help="Optional Parquet to save features+labels.")
 
+    p.add_argument("--roc-path", type=str, default=None, help="If set, save a TPR-vs-FPR ROC plot to this path.")
+
     return p
+
+def save_roc_plot(y_true: np.ndarray, y_score: np.ndarray, out_path: str, title: str = "TPR vs FPR (ROC)") -> None:
+    fpr, tpr, _ = roc_curve(y_true, y_score)
+    auc = roc_auc_score(y_true, y_score)
+
+    plt.figure()
+    plt.plot(fpr, tpr, label=f"AUC = {auc:.3f}")
+    plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1)
+    plt.xlabel("False Positive Rate (FPR)")
+    plt.ylabel("True Positive Rate (TPR)")
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.grid(True, linestyle=":", linewidth=0.5)
+    plt.tight_layout()
+
+    # ensure parent dir exists if provided
+    if out_path and os.path.dirname(out_path):
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+    print(f"[info] Saved ROC curve -> {out_path}")
+
 
 
 def run_baseline(args: argparse.Namespace) -> None:
@@ -401,6 +434,10 @@ def run_baseline(args: argparse.Namespace) -> None:
     print("\n-- Best-Accuracy --")
     for k, v in m_a.items():
         print(f"{k}: {v}")
+
+
+    if args.roc_path:
+        save_roc_plot(v_labels, v_scores, args.roc_path, title=f"ROC (baseline, {args.backbone})")
 
     _maybe_save_results(args, df, scores)
 
@@ -486,6 +523,9 @@ def run_evaluate_saved(args: argparse.Namespace) -> None:
     print("\n-- Best-Accuracy --")
     for k, v in m_a.items():
         print(f"{k}: {v}")
+
+    if args.roc_path:
+        save_roc_plot(v_labels, v_scores, args.roc_path, title=f"ROC (evaluate_saved, {backbone_name})")
 
     _maybe_save_results(args, df, scores)
 
