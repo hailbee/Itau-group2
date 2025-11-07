@@ -13,6 +13,8 @@ import os
 from typing import Dict, List, Tuple
 from tqdm import tqdm
 
+from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
+
 import numpy as np
 import pandas as pd
 import torch
@@ -289,34 +291,75 @@ def run_pairwise_mlp(args: argparse.Namespace) -> None:
         print(f"[info] Saved eval results to {args.save_results}")
 
 
+def run_optuna(args: argparse.Namespace) -> None:
+    """
+    Hyperparameter optimization training using your existing UnifiedHyperparameterOptimizer.
+    Mirrors the interface from your older script so your previous command keeps working.
+    """
+    # Validate required inputs
+    if not args.training_filepath or not args.test_filepath:
+        raise SystemExit("--mode optuna requires --training_filepath and --test_filepath")
+
+    os.makedirs(args.log_dir, exist_ok=True)
+
+    optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=args.device, log_dir=args.log_dir)
+
+    opt_params = {
+        "n_trials": args.n_trials,
+        "sampler": args.sampler,
+        "pruner": (None if args.pruner == "none" else args.pruner),
+        "study_name": args.study_name,
+        "epochs": args.epochs,
+    }
+
+    # This matches your old call signature
+    _ = optimizer.optimize(
+        method="optuna",
+        training_filepath=args.training_filepath,
+        test_filepath=args.test_filepath,
+        mode=args.model_type,
+        loss_type=args.loss_type,
+        medium_filepath=args.medium_filepath,
+        easy_filepath=args.easy_filepath,
+        curriculum=args.curriculum,
+        validate_filepath=args.validate_filepath,
+        **opt_params,
+    )
+
+    print(f"[optuna] Completed. Check logs/artifacts in: {args.log_dir}")
+
+
 # -----------
 # Main driver
 # -----------
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Unified entry point for baseline and evaluate_saved.")
+    p = argparse.ArgumentParser(description="Unified entry point for baseline, evaluate_saved, and optuna.")
 
     # Modes
-    p.add_argument("--mode", type=str, required=True, choices=["baseline", "evaluate_saved"],
-                   help="baseline: zero/one-shot eval without training; evaluate_saved: load a trained checkpoint and evaluate.")
+    p.add_argument("--mode", type=str, required=True,
+                   choices=["baseline", "evaluate_saved", "optuna"],
+                   help="baseline: zero/one-shot eval; evaluate_saved: load a trained checkpoint; optuna: train with HPO.")
 
-    # Pairs / columns
-    p.add_argument("--pairs", type=str, required=True, help="CSV/TSV/Parquet with left/right/label columns.")
-    p.add_argument("--left-col", type=str, default="fraudulent_name", help="Column name for left/query word.")
-    p.add_argument("--right-col", type=str, default="real_name", help="Column name for right/reference word.")
-    p.add_argument("--label-col", type=str, default="label", help="Column name for binary label (0/1).")
+    # Data for evaluation/baseline (pairs only needed for those modes)
+    p.add_argument("--pairs", type=str, default=None,
+                   help="CSV/TSV/Parquet with left/right/label columns (required for baseline/evaluate_saved).")
+    p.add_argument("--left-col", type=str, default="fraudulent_name")
+    p.add_argument("--right-col", type=str, default="real_name")
+    p.add_argument("--label-col", type=str, default="label")
 
     # Backbone selection
     p.add_argument("--backbone", type=str, default="clip",
-                   help="Backbone name: clip, siglip, flava, coca, or precomputed (glyph-embedding NPZ).")
-    p.add_argument("--model-name", type=str, default=None, help="Optional HF/openai model name for certain backbones.")
-    p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="cuda or cpu.")
+                   help="Backbone: clip, siglip, flava, coca, or precomputed.")
+    p.add_argument("--model-name", type=str, default=None,
+                   help="Optional HF/OpenAI model name for certain backbones.")
+    p.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
 
     # Precomputed-specific
     p.add_argument("--npz", nargs="+", default=None,
                    help="(precomputed) One or more NPZ files mapping word -> 1D vector.")
     p.add_argument("--pc-norm", action="store_true",
-                   help="(precomputed) L2-normalize vectors on load/encode (use only if NPZ not already normalized).")
+                   help="(precomputed) L2-normalize vectors on load/encode.")
     p.add_argument("--pc-case-sensitive", action="store_true",
                    help="(precomputed) Treat NPZ keys as case-sensitive (default lowercases).")
     p.add_argument("--pc-non-strict", action="store_true",
@@ -324,30 +367,61 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     # Projector / batching
     p.add_argument("--projection-dim", type=int, default=128,
-                   help="Projection size if a projector is used (ignored for precomputed).")
-    p.add_argument("--batch-size", type=int, default=2048, help="Batch size for encoding/scoring.")
+                   help="Projection size if projector is used (ignored for precomputed).")
+    p.add_argument("--batch-size", type=int, default=2048,
+                   help="Batch size for encoding/scoring.")
 
-    # Evaluate_saved (checkpointed models)
-    p.add_argument("--checkpoint", type=str, default=None, help="Path to a saved model checkpoint (evaluate_saved).")
+    # evaluate_saved
+    p.add_argument("--checkpoint", type=str, default=None,
+                   help="Path to a saved model checkpoint (evaluate_saved).")
 
-    # Outputs
-    p.add_argument("--save-results", type=str, default=None, help="Optional CSV/Parquet to save per-pair scores.")
+    # Outputs (common)
+    p.add_argument("--save-results", type=str, default=None,
+                   help="Optional CSV/Parquet to save per-pair scores.")
+    p.add_argument("--roc-path", type=str, default=None,
+                   help="If set, save a TPR-vs-FPR ROC plot to this path.")
 
-    # Pairwise-MLP head (optional)
-    p.add_argument("--pairwise-mlp", action="store_true", help="Use an MLP head on pairwise embedding features instead of cosine threshold.")
+    # Pairwise-MLP head (optional, baseline mode)
+    p.add_argument("--pairwise-mlp", action="store_true",
+                   help="Use an MLP head on pairwise features instead of cosine.")
     p.add_argument("--mlp-hidden", type=int, default=64)
     p.add_argument("--mlp-dropout", type=float, default=0.10)
     p.add_argument("--mlp-epochs", type=int, default=30)
     p.add_argument("--mlp-lr", type=float, default=1e-3)
     p.add_argument("--mlp-weight-decay", type=float, default=1e-4)
-    p.add_argument("--mlp-split", type=float, default=0.40, help="Train split fraction for the MLP (default 0.40; remaining is eval).")
-    p.add_argument("--save-head", type=str, default=None, help="Optional path to save trained MLP head (.pt).")
-    p.add_argument("--load-head", type=str, default=None, help="Optional path to load a pre-trained MLP head (.pt).")
-    p.add_argument("--save-features", type=str, default=None, help="Optional Parquet to save features+labels.")
+    p.add_argument("--mlp-split", type=float, default=0.40)
+    p.add_argument("--save-head", type=str, default=None)
+    p.add_argument("--load-head", type=str, default=None)
+    p.add_argument("--save-features", type=str, default=None)
 
-    p.add_argument("--roc-path", type=str, default=None, help="If set, save a TPR-vs-FPR ROC plot to this path.")
+    # --- NEW: training / validation / optimization args for optuna mode ---
+    p.add_argument("--training_filepath", type=str, default=None,
+                   help="Path to training data (CSV/Parquet). Required for optuna.")
+    p.add_argument("--test_filepath", type=str, default=None,
+                   help="Path to test/eval data (CSV/Parquet). Required for optuna.")
+    p.add_argument("--validate_filepath", type=str, default=None,
+                   help="Optional validation set used during/after training.")
+    p.add_argument("--model_type", type=str,
+                   choices=["pair", "triplet", "supcon", "infonce"], default="infonce")
+    p.add_argument("--loss_type", type=str,
+                   choices=["cosine", "euclidean", "hybrid", "supcon", "infonce"], default="infonce")
+    p.add_argument("--epochs", type=int, default=10)
+    p.add_argument("--curriculum", type=str, default=None)
+    p.add_argument("--medium_filepath", type=str, default=None)
+    p.add_argument("--easy_filepath", type=str, default=None)
+
+    # HPO controls (Optuna)
+    p.add_argument("--n_trials", type=int, default=10)
+    p.add_argument("--sampler", type=str, choices=["tpe", "random", "cmaes"], default="tpe")
+    p.add_argument("--pruner", type=str, choices=["median", "hyperband", "none"], default="median")
+    p.add_argument("--study_name", type=str, default=None)
+
+    # Logging
+    p.add_argument("--log-dir", type=str, default="./logs",
+                   help="Directory to write checkpoints/results.")
 
     return p
+
 
 def save_roc_plot(y_true: np.ndarray, y_score: np.ndarray, out_path: str, title: str = "TPR vs FPR (ROC)") -> None:
     fpr, tpr, _ = roc_curve(y_true, y_score)
@@ -560,9 +634,10 @@ def main():
             run_baseline(args)
     elif args.mode == "evaluate_saved":
         run_evaluate_saved(args)
+    elif args.mode == "optuna":
+        run_optuna(args)
     else:
         raise SystemExit(f"Unsupported mode: {args.mode}")
-
 
 if __name__ == "__main__":
     main()
