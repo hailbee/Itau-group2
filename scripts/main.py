@@ -291,19 +291,136 @@ def run_pairwise_mlp(args: argparse.Namespace) -> None:
         print(f"[info] Saved eval results to {args.save_results}")
 
 
-def run_optuna(args: argparse.Namespace) -> None:
-    """
-    Hyperparameter optimization training using your existing UnifiedHyperparameterOptimizer.
-    Mirrors the interface from your older script so your previous command keeps working.
-    """
-    # Validate required inputs
-    if not args.training_filepath or not args.test_filepath:
-        raise SystemExit("--mode optuna requires --training_filepath and --test_filepath")
+def optuna_precomputed_pairwise_head(args: argparse.Namespace) -> None:
+    import optuna
+    from model_utils.features.pairwise import pairwise_features
+    from model_utils.trainers.pairwise_mlp_trainer import train_pairwise_mlp, best_youden_threshold
+    from model_utils.heads.pairwise_mlp import PairwiseMLP
+
+    # Build precomputed wrapper + base model
+    wrapper = ModelFactory.create_model(
+        "precomputed",
+        npz_paths=args.npz,
+        lowercase_keys=not args.pc_case_sensitive,
+        normalize=args.pc_norm,
+        strict=not args.pc_non_strict,
+    )
+    model = BaseSiameseModel(backbone=wrapper, projection_dim=wrapper.embedding_dim, use_projector=False)
+
+    # Load pairs and compute features once (offline)
+    df = load_pairs_dataframe(args.pairs or args.test_filepath, args.left_col, args.right_col, args.label_col)
+    y = df[args.label_col].astype(int).to_numpy()
+    eL, eR, valid = compute_pairwise_embeddings(
+        model=model,
+        left=df[args.left_col].astype(str).tolist(),
+        right=df[args.right_col].astype(str).tolist(),
+        batch_size=args.batch_size,
+    )
+    if valid.sum() == 0:
+        raise SystemExit("[optuna-precomputed] no valid pairs found.")
+    X = pairwise_features(eL[valid], eR[valid])
+    y = y[valid]
+
+    # Split (fixed) train/eval split so trials are comparable
+    rng = np.random.RandomState(42)
+    idx = np.arange(len(X)); rng.shuffle(idx)
+    cut = int(args.mlp_split * len(X))
+    tr_idx, ev_idx = idx[:cut], idx[cut:]
+    Xtr, Ytr = X[tr_idx], y[tr_idx]
+    Xev, Yev = X[ev_idx], y[ev_idx]
+
+    # Class-weight
+    pos = max(1, int(Ytr.sum()))
+    neg = max(1, int((Ytr == 0).sum()))
+    pos_weight = neg / pos
 
     os.makedirs(args.log_dir, exist_ok=True)
 
-    optimizer = UnifiedHyperparameterOptimizer(args.backbone, device=args.device, log_dir=args.log_dir)
+    def objective(trial: optuna.Trial):
+        hidden = trial.suggest_categorical("hidden", [64, 96, 128, 192, 256])
+        dropout = trial.suggest_float("dropout", 0.0, 0.5)
+        lr = trial.suggest_float("lr", 1e-4, 3e-3, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+        epochs = trial.suggest_int("epochs", max(10, args.epochs), max(30, args.epochs))
 
+        model_head, best_auc = train_pairwise_mlp(
+            Xtr, Ytr, Xev, Yev,
+            hidden=hidden, dropout=dropout,
+            lr=lr, epochs=epochs,
+            weight_decay=weight_decay,
+            pos_weight=pos_weight,
+            device=(args.device if torch.cuda.is_available() and args.device.startswith("cuda") else "cpu"),
+        )
+        # We optimize AUC
+        return best_auc
+
+    study = optuna.create_study(direction="maximize", study_name=args.study_name)
+    study.optimize(objective, n_trials=args.n_trials)
+
+    # Train final head with best params on the same split & evaluate
+    bp = study.best_params
+    model_head, best_auc = train_pairwise_mlp(
+        Xtr, Ytr, Xev, Yev,
+        hidden=bp.get("hidden", 128),
+        dropout=bp.get("dropout", 0.1),
+        lr=bp.get("lr", 1e-3),
+        epochs=bp.get("epochs", args.epochs),
+        weight_decay=bp.get("weight_decay", 1e-4),
+        pos_weight=pos_weight,
+        device=(args.device if torch.cuda.is_available() and args.device.startswith("cuda") else "cpu"),
+    )
+    model_head.eval()
+    with torch.no_grad():
+        logits = model_head(torch.from_numpy(Xev)).cpu().numpy()
+    probs = 1 / (1 + np.exp(-logits))
+    auc = roc_auc_score(Yev, probs)
+    thr, tpr, fpr, youden = best_youden_threshold(Yev, probs)
+    pred = (probs >= thr).astype(int)
+    tn, fp, fn, tp = confusion_matrix(Yev, pred).ravel()
+    acc = accuracy_score(Yev, pred)
+
+    print("\n=== Optuna (precomputed head) Summary ===")
+    print(f"Best AUC: {auc:.6f}")
+    print(f"Best params: {study.best_params}")
+    print(f"Threshold (Youden): {thr:.4f}  TPR={tpr:.4f}  FPR={fpr:.4f}  Youden={youden:.4f}")
+    print(f"Confusion: [[{tn} {fp}] [{fn} {tp}]]  Acc={acc:.4f}")
+
+    # Save artifacts
+    os.makedirs(args.log_dir, exist_ok=True)
+    with open(os.path.join(args.log_dir, "best_params.json"), "w") as f:
+        import json
+        json.dump(study.best_params, f, indent=2)
+
+    if args.save_head:
+        torch.save(model_head.state_dict(), args.save_head)
+        print(f"[optuna-precomputed] saved head -> {args.save_head}")
+
+    if args.roc_path:
+        save_roc_plot(Yev, probs, args.roc_path, title="ROC (precomputed head)")
+
+
+def run_optuna(args: argparse.Namespace) -> None:
+    if not args.training_filepath or not args.test_filepath:
+        raise SystemExit("--mode optuna requires --training_filepath and --test_filepath")
+
+    # If you want HPO over a learnable backbone, keep your existing optimizer path.
+    if args.backbone.lower() == "precomputed":
+        # Reuse the pairwise head HPO above
+        # We need pairs for features. Use test_filepath for pairs (or pass --pairs explicitly).
+        if not (args.pairs or args.test_filepath):
+            raise SystemExit("optuna + precomputed requires --pairs or --test_filepath to build pairs.")
+        optuna_precomputed_pairwise_head(args)
+        return
+
+    # Otherwise, keep the original backbone-based HPO
+    from scripts.optimization.unified_optimizer import UnifiedHyperparameterOptimizer
+    os.makedirs(args.log_dir, exist_ok=True)
+    optimizer = UnifiedHyperparameterOptimizer(
+        model_type=args.backbone,
+        model_name=args.model_name,
+        device=args.device,
+        log_dir=args.log_dir,
+    )
     opt_params = {
         "n_trials": args.n_trials,
         "sampler": args.sampler,
@@ -311,9 +428,7 @@ def run_optuna(args: argparse.Namespace) -> None:
         "study_name": args.study_name,
         "epochs": args.epochs,
     }
-
-    # This matches your old call signature
-    _ = optimizer.optimize(
+    optimizer.optimize(
         method="optuna",
         training_filepath=args.training_filepath,
         test_filepath=args.test_filepath,
@@ -325,7 +440,6 @@ def run_optuna(args: argparse.Namespace) -> None:
         validate_filepath=args.validate_filepath,
         **opt_params,
     )
-
     print(f"[optuna] Completed. Check logs/artifacts in: {args.log_dir}")
 
 
