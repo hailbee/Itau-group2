@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import roc_auc_score, roc_curve
+from typing import Optional
 
 from model_utils.heads.pairwise_mlp import PairwiseMLP
 
@@ -36,9 +37,12 @@ def train_pairwise_mlp(
 
     best_auc, best_sd = -1.0, None
 
-    for _ in range(epochs):
-        print(f"Epoch {_+1}/{epochs}")
+    for epoch in range(epochs):
+        print(f"Epoch {epoch+1}/{epochs}")
         model.train()
+        total_loss = 0.0
+        total_n = 0
+
         for xb, yb in train_dl:
             xb = xb.to(device); yb = yb.to(device)
             opt.zero_grad()
@@ -46,21 +50,33 @@ def train_pairwise_mlp(
             loss = crit(logits, yb)
             loss.backward()
             opt.step()
+            total_loss += loss.item() * xb.size(0)
+            total_n += xb.size(0)
 
+        avg_loss = total_loss / max(1, total_n)
+
+        # ---- validation ----
         model.eval()
         with torch.no_grad():
             all_logits, all_y = [], []
             for xb, yb in val_dl:
                 xb = xb.to(device)
-                all_logits.append(model(xb).cpu())
+                all_logits.append(model(xb).cpu().squeeze())
                 all_y.append(yb)
             logits = torch.cat(all_logits).numpy()
-            y_true = torch.cat(all_y).numpy()
-            probs = 1 / (1 + np.exp(-logits))
+            y_true = torch.cat(all_y).numpy().astype(int)
+            probs = 1.0 / (1.0 + np.exp(-logits))
+            preds = (probs >= 0.5).astype(int)
+            val_acc = (preds == y_true).mean().item()
             auc = roc_auc_score(y_true, probs)
-            if auc > best_auc:
-                best_auc = auc
-                best_sd = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+        # ---- print metrics ----
+        print(f"[epoch {epoch+1:02d}] "
+            f"train_loss={avg_loss:.4f}  val_acc={val_acc:.4f}  val_auc={auc:.4f}")
+
+        if auc > best_auc:
+            best_auc = auc
+            best_sd = {k: v.cpu().clone() for k, v in model.state_dict().items()}
 
     model.load_state_dict(best_sd)
     return model, best_auc
