@@ -120,7 +120,7 @@ def build_pair_dataset(parquet_path, emb_tensor, name_to_idx, split_name):
         lbl_raw = int(row["label"])
         if lbl_raw == 1:
             lbl = 1.0
-        elif lbl_raw == 2:
+        elif lbl_raw == 0:
             lbl = 0.0
         else:
             # Skip unexpected label values
@@ -211,7 +211,7 @@ def make_dataloader(dataset, batch_size, shuffle=True, num_workers=0):
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=False,
     )
 
 
