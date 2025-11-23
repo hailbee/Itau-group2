@@ -5,6 +5,7 @@ import os
 from copy import deepcopy
 
 import numpy as np
+import sys
 import optuna
 import pandas as pd
 import torch
@@ -299,6 +300,8 @@ def evaluate_model(model, dataset, device, margin, roc_plot_path=None, split_nam
 
     # Optional ROC plot
     if roc_plot_path is not None:
+        os.makedirs(os.path.dirname(roc_plot_path), exist_ok=True)
+
         plt.figure()
         plt.plot(fpr, tpr, label=f"{split_name} ROC (AUC = {roc_auc:.4f})")
         plt.plot([0, 1], [0, 1], "k--", label="Random")
@@ -344,6 +347,9 @@ def run_training(
     save_best=True,
 ):
     batch_size = min(batch_size, 512)
+
+    if make_plots and output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
 
     model = TextToImageMLP(text_dim=text_dim, img_dim=img_dim, hidden_dim=hidden_dim)
     model.to(device)
@@ -571,6 +577,27 @@ def run_training(
         "model": model,
     }
 
+def ensure_file_exists(path: str, description: str, required: bool = True):
+    """
+    Check if a file exists. If required and missing, exit with a clear error.
+    If not required and missing, print a warning.
+    """
+    if not path:
+        if required:
+            print(f"[ERROR] Required {description} path is empty or not provided.")
+            sys.exit(1)
+        else:
+            print(f"[WARNING] Optional {description} path not provided.")
+            return False
+
+    if not os.path.isfile(path):
+        msg = f"[ERROR] {description} file does not exist: {path}"
+        print(msg)
+        sys.exit(1)
+
+    print(f"[OK] Found {description} at: {path}")
+    return True
+
 
 # -----------------------------
 # CLI
@@ -632,11 +659,34 @@ def parse_args():
 def main():
     args = parse_args()
 
+    if args.output_dir is not None:
+        os.makedirs(args.output_dir, exist_ok=True)
+
     # Device
     if args.device == "auto":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(args.device)
+
+    # Text embeddings
+    ensure_file_exists(args.train_text_embeddings, "train text embeddings")
+    ensure_file_exists(args.val_text_embeddings, "validation text embeddings")
+    if args.test_text_embeddings:
+        ensure_file_exists(args.test_text_embeddings, "test text embeddings", required=False)
+
+    # Image embeddings
+    ensure_file_exists(args.train_image_embeddings, "train image embeddings")
+    ensure_file_exists(args.val_image_embeddings, "validation image embeddings")
+    if args.test_image_embeddings:
+        ensure_file_exists(args.test_image_embeddings, "test image embeddings", required=False)
+
+    # Pair files
+    ensure_file_exists(args.easy_pairs, "easy train pairs")
+    ensure_file_exists(args.medium_pairs, "medium train pairs")
+    ensure_file_exists(args.hard_pairs, "hard train pairs")
+    ensure_file_exists(args.val_pairs, "validation pairs")
+    if args.test_pairs:
+        ensure_file_exists(args.test_pairs, "test pairs", required=False)
 
     # Load embeddings
     print("Loading train text embeddings...")
@@ -816,6 +866,7 @@ def main():
         )
 
 
+
 if __name__ == "__main__":
     main()
 
@@ -833,7 +884,7 @@ if __name__ == "__main__":
 #   --medium-pairs data/processed/train_pairs_medium_100k.parquet \
 #   --hard-pairs   data/processed/train_pairs_hard_100k.parquet \
 #   --val-pairs    data/processed/validate_pairs_ref_10k.parquet \
-#   --test-pairs   data/processed/test_pairs_ref_10k.parquet \
+#   --test-pairs   data/processed/test_pairs_10k.parquet \
 #   --epochs 10 \
 #   --batch-size 512 \
 #   --lr 1e-3 \
